@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 $opencartInstaller = new OpencartInstaller();
 
@@ -470,20 +470,38 @@ class OpencartInstaller {
 </head>
 <body>
     <style>
-
     body {
         background-color:#F6F9FC;
     }
-    .form {
-        display:block;
-        padding: 0 20px;
+    .header{
+        position:fixed;
+        height:90px;
+        padding:5px 10px;
+        width:100%;
+        background: #F6F9FC;
+        z-index:1000;
+        border-bottom:1px solid #dfe4e8;
     }
-    .ve-field {
-        margin: 20px 0;
+    .header .logo{
+        display: block;
+        padding: 6px;
+        float: left;
     }
-    .submit-btn {
-        padding: 0 25px;
-        width: 100%;
+    .header .logo img{
+        display: block;
+    }
+    .header .form{
+        display: block;
+        padding: 20px 30px;
+        float: left;
+    }
+    .header .store-link{
+        padding: 20px;
+        float: left;
+    }
+    .content{
+        padding: 30px;
+        padding-top:120px;
     }
     .hide {
         display: none;
@@ -491,130 +509,122 @@ class OpencartInstaller {
     .link-shopunity:hover {
         text-decoration: none;
     }
-</style>
-    <div id="wrapper">
+    .preloader-wrap{
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        z-index: 1000;
+        background: rgba(0,0,0,0.6);
+    }
+    
+    .header .ve-label{
+        margin: 0px 10px ;
+    }
 
-        <!-- Logo -->
-        <div style="text-align: center; margin-top: 20px">
-            <a href="https://shopunity.net">
+    .header .ve-checkbox{
+        margin-bottom:5px;
+    }
+</style>
+    
+    <div class="preloader-wrap hide">
+        <span class="preloader"></span>
+    </div>
+    <div id="wrapper">
+        
+        <!-- Store Creator -->
+        <div class="header">   
+            <a class="logo" href="https://shopunity.net">
                 <img src="https://shopunity.net/catalog/view/theme/default/image/logo.png">
             </a>
+            <form id="form" action="" method="post" class="form">
+                <div class="ve-field ve-field--inline">
+                    <label for="input_version" class="ve-label">OC version:</label>
+                    <select class="ve-input ve-input--lg"  name="version" id="input_version" onchange="changeVersion()">';
+foreach($this->versions as $version){
+$html .= '<option value="'.$version["code"].'">'.$version["version"].'</option>';
+}
+$html .= '              </select>
+                    <label class="ve-label" for="input_name"> Codename:</label>
+                    <input class="ve-input ve-input--lg"  type="text" name="name" id="input_name"/>
+                    <span class="ve-btn ve-btn--success ve-btn--lg submit-btn" id="submit">Create Store</span>
+                    <label class="ve-checkbox ve-label" for="shopunity"> <input type="checkbox" checked  class="ve-input" id="shopunity" name="shopunity"><i></i> Install Shopunity</label>
+                </div>
+                
+            </form>
+            <div class="store-link hide">
+                <a href="" id="link_to_shop"><span class="ve-btn ve-btn--success ve-btn--lg submit-btn ">Go to Store</span></a>
+            </div>
         </div>
-        <div class="row">
-        
-            <!-- Store Creator -->
-            <div class="ve-col-3" style="margin: 35px 40px;">
-                <div class="ve-card">
-                    <div class="ve-card__header">
-                        <h2 class="ve-h3">Store Creator</h2>
-                    </div>
-                    <div class="ve-card__section">
-                        <form id="form" action="" method="post" class="form">
-                            <div class="ve-field">
-                                <label for="input_version" class="ve-label  ">Opencart version:</label>
-                                <select class="ve-input"  name="version" id="input_version" onchange="changeVersion()">';
-        foreach($this->versions as $version){
-            $html .= '<option value="'.$version["code"].'">'.$version["version"].'</option>';
-        }
-        $html .= '              </select>
-                            </div>
-                            <div class="ve-field">
-                                <label class="ve-label" for="input_name">Store codename:</label>
-                                <input class="ve-input" type="text" name="name" id="input_name"/>
-                            </div>
-                            <div class="ve-field">
-                                <label class="ve-label" for="new_store_link">Store URL:</label>
-                                <input class="ve-input form-control" type="text" id="new_store_link" readonly style="font-size: 18px;"/>
-                            </div>
-
-                            <div class="form-check" style="margin: 20px 0;">
-                                <input type="checkbox" checked   class="form-check-input" id="shopunity" name="shopunity">
-                                <label class="form-check-label" for="shopunity">Download Shopunity</label>
-                            </div>
-                            
-                            <span class="ve-btn ve-btn--success ve-btn--lg submit-btn" id="submit">Create Store</span>
-                        </form>
-                        <div style="width: 60%; margin: 0 auto; text-align: center;">
-                            <a href="" class="hide" id="link_to_shop"><span class="ve-btn ve-btn--success ve-btn--lg submit-btn ">Go to Store</span></a>
-                        </div>
-                        <div class="preloader-wrap hide">
-                            <span class="preloader"></span>
-                        </div>
-                    </div>
-                    </div>
-                </div>
-                
-                <!-- Shops -->
-                <div class="ve-col-8" style="margin: 35px 20px">
-                    <div class="row" id="pointerEventsShops">';
-        $i = 1;
-        foreach ($folders as $version => $shops) {
-            if (!$shops == null) {
-                $html .= '<div class="ve-col-4">
-                            <div class="ve-card">
-                                 <div class="ve-card__header">
-                                    <h2 class="ve-h3">Folder - '.$version.'</h2>
-                                </div>
-                                <div class="ve-card__section">
-                                <div class="ve-list ve-list--borderless ve-card">';
-                foreach ($shops as $shop) {
-                    // Git
-                    if ($shop["git"]) {
-                        $a_git = 'Git: <a href="'.$shop["git"].'" target="_blank" class="label" title="'.$shop["git"].'">here</a>';
-                    } else {
-                        $a_git = 'Git: none';
-                    }
-
-                    // Shop link
-                    if (!$shop["db"]){
-                        $shop_link_class = 'class="not-working"';
-                    } else {
-                        $shop_link_class = "";
-                    }
-
-                    // Delete Store button
-                    $delete_but = '<a href="#" style="font-size:10px;" class="delete delete-store btn btn-danger" data-store="'.$shop["path"].'" data-database="'.$shop["db"].'">delete</a>';
-
-                    // Database
-                    $database = 'Db: '.$shop['db'];
-                    if (empty($shop["db"])) {
-                        $database = 'Db: none';
-                    }
-
-                    // Output
-                    $html .= '   <div class="ve-list__item">
-                                    <div class="row" style="padding:5">
-                                       <span class="ve-col-10" style="font-size:18px; margin: 10px 0"><a href="'.$shop["link"].'" title="'.$shop["db"].'">'.$i.') '.$shop['name'].'</a></span>
-                                       <span class="ve-col-10" style="margin: 10px 0">'.$database.'</span>
-                                       <span class="ve-col-6" style="margin: 10px 0">'.$a_git.'</span>
-                                       <span class="ve-col-3"></span>
-                                       <span class="ve-col-1">'.$delete_but.'</span><br>
+        <div class="content">
+            <div class="row" id="pointerEventsShops">';
+            $i = 1;
+            foreach ($folders as $version => $shops) {
+                if (!$shops == null) {
+                    $html .= '<div class="ve-col-3">
+                                <div class="ve-card">
+                                     <div class="ve-card__header">
+                                        <h2 class="ve-h3">'.$version.'</h2>
                                     </div>
-                                </div>';
-                    //$html .=  '<li style="margin-bottom: 20px">'.$a_git.$shop_link.$delete_but.$database.'</li>';
-                    $i++;
+                                    <div class="ve-list ve-list--borderless">';
+                    foreach ($shops as $shop) {
+                        // Git
+                        if ($shop["git"]) {
+                            $a_git = ' <a href="'.$shop["git"].'" target="_blank" class="ve-btn ve-btn--default ve-btn--sm" title="'.$shop["git"].'">Git</a>';
+                        } else {
+                            $a_git = '';
+                        }
+
+                        // Shop link
+                        if (!$shop["db"]){
+                            $shop_link_class = 'class="not-working"';
+                        } else {
+                            $shop_link_class = "";
+                        }
+
+                        // Delete Store button
+                        $delete_but = '<a class="delete delete-store ve-btn ve-btn--danger ve-btn--sm" data-store="'.$shop["path"].'" data-database="'.$shop["db"].'">X</a>';
+
+                        // Database
+                        $database = $shop['db'];
+                        if (empty($shop["db"])) {
+                            $database = 'Db: none';
+                        }
+
+                        // Output
+                        $html .= '   <div class="ve-list__item">
+                                        <div>
+                                            <span style="padding-left: 0px; flex: 0;">'.$a_git.'</span>
+                                            <div class="text-left"><a href="'.$shop["link"].'" title="'.$shop["db"].'">'.$shop['name'].'</a><br/>
+                                            <span class="small" style="margin-top: 5px; display:inline-block">'.$database.'</span>
+                                            </div>
+                                           
+                                           <span class="text-right">'.$delete_but.'</span>
+                                        </div>
+                                    </div>';
+                        //$html .=  '<li style="margin-bottom: 20px">'.$a_git.$shop_link.$delete_but.$database.'</li>';
+                        $i++;
+                    }
+                    $html .= '</div></div></div>';
                 }
-                $html .= '</div></div></div></div>';
             }
-        }
-        $html .='</div> 
+            $html .='
                 </div>
-                
-                <!-- Databases -->
-                <div class="ve-col-11" style="margin: 0 auto 100px auto;">
-                    <div class="ve-card" id="pointerEventsDb">
-                        <div class="ve-card__header">
-                            <h2 class="ve-h2">Databases</h2>
-                        </div>
-                        <hr class="ve-hr"/>
-                        <div class="ve-card__section"  style="padding-top: 30px">
-                            <div class="ve-col-12">
-                                <ol style="columns: 4;">';
-        foreach ($db_list as $db) {
-            $html .= '<li style="margin-bottom: 10px"><span style="cursor: text;">'.$db.'</span>
-                        <a style="margin-left: 5px" href="#" class="delete delete-database btn btn-danger" data-database="'.$db.'"><span style="font-size: 10px;">delete</span></a></li>';
-        }
-        $html .= '            </ol>
+                <div class="row" id="pointerEventsDb">
+                    <!-- Databases -->
+                    <div class="ve-col-12" >
+                        <div class="ve-card">
+                            <div class="ve-card__header">
+                                <h2 class="ve-h2">Unused databases</h2>
+                            </div>
+                            <hr class="ve-hr"/>
+                            <div class="ve-card__section"  style="padding-top: 30px">
+                                <div class="ve-col-12">
+                                    <ol style="columns: 4;">';
+            foreach ($db_list as $db) {
+                $html .= '<li style="margin-bottom: 10px; padding-right:40px;"><span style="cursor: text;">'.$db.'</span>
+                            <a style="" class="delete delete-database ve-btn ve-btn--danger ve-pull-right" data-database="'.$db.'"><span style="font-size: 10px;">X</span></a></li>';
+            }
+            $html .= '        </ol>
                             </div>
                         </div>
                     </div>
@@ -623,10 +633,12 @@ class OpencartInstaller {
             <div class="footer ve-col-11" style="margin: 0 auto; color: #929292; text-align: center;">
                 <hr class="ve-hr">
                 <div style="margin: 10px 0 5px 0">OpencartInstaller version:  <span style="margin-left: 5px">'.$this->OIversion .'</span></div>
-                <div style="margin-bottom: 20px">Powered by <a class="link-shopunity" href="https://shopunity.net">Shopunity.net</a></div>
+                <div style="margin-bottom: 20px">
+                    Powered by <a class="link-shopunity" href="https://shopunity.net">Shopunity.net</a>
+                </div>
             </div>
-         </div>
-    
+        </div>
+    </div>
     <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
     <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/spin.js/2.3.2/spin.min.js"></script>
     <script type="text/javascript" src="//igorescobar.github.io/jQuery-Mask-Plugin/js/jquery.mask.min.js"></script>
@@ -681,7 +693,7 @@ class OpencartInstaller {
         } else {
             $html .= '
                 $("#submit").on("click",function(){
-                    $("#submit").slideUp("slow");
+                    $("#form").slideUp("slow");
                     $.ajax({
                         url: "http://'.$_SERVER["HTTP_HOST"] . rtrim(dirname($_SERVER["SCRIPT_NAME"]), "/.\\") .'/index.php",
                         type: "post",
@@ -689,20 +701,19 @@ class OpencartInstaller {
                         dataType: "html",
                         beforeSend: function() {
                             $(".preloader-wrap").removeClass("hide");
-                            document.getElementById("form").style.opacity = "0.5";
-                            document.getElementById("form").style.pointerEvents = "none";
+                            $("#form").addClass("hide");
                             document.getElementById("pointerEventsShops").style.pointerEvents = "none";
                             document.getElementById("pointerEventsDb").style.pointerEvents = "none";
                         },
                         complete: function() {
                             $(".preloader-wrap").addClass("hide");
-                            document.getElementById("form").style.opacity = "1";
-                            document.getElementById("form").style.pointerEvents = "auto";
+                            $("#form").addClass("hide");
                             document.getElementById("pointerEventsShops").style.pointerEvents = "auto";
                             document.getElementById("pointerEventsDb").style.pointerEvents = "auto";
                         },
                         success: function(html) {
-                            $("#link_to_shop").attr("href", "http://'.$_SERVER["HTTP_HOST"] . rtrim(dirname($_SERVER["SCRIPT_NAME"]), "/.\\") . "/".'"+$("#input_version").val() + "/"+$("#input_name").val()).slideDown();
+                            $("#link_to_shop").attr("href", "http://'.$_SERVER["HTTP_HOST"] . rtrim(dirname($_SERVER["SCRIPT_NAME"]), "/.\\") . "/".'"+$("#input_version").val() + "/"+$("#input_name").val());
+                            $(".store-link").removeClass("hide");
                         },
                         error: function(xhr, ajaxOptions, thrownError) {
                             console.log(thrownError + "\r\n" + xhr.statusText + "\r\n" + xhr.responseText);
@@ -714,7 +725,7 @@ class OpencartInstaller {
                 var delete_database = confirm("Are you sure, you want to delete this database?");
                 if (delete_database === true) {
 
-                	var database = $(this);
+                    var database = $(this);
 
                      $.ajax({
                          url: "http://'.$_SERVER["HTTP_HOST"] . rtrim(dirname($_SERVER["SCRIPT_NAME"]), " /.\\") .'/index.php",
@@ -767,20 +778,6 @@ class OpencartInstaller {
                 }
             })
             
-    </script>
-    <script>
-        var url = "http://'.$_SERVER["HTTP_HOST"] . rtrim(dirname($_SERVER["SCRIPT_NAME"]), "/.\\") .'/";
-        var input_name = document.getElementById("input_name");
-        var version = document.getElementById("input_version").value;
-        document.getElementById("new_store_link").value = url + version + "/";
-        function changeVersion() {
-        	var version = document.getElementById("input_version").value;
-	        document.getElementById("new_store_link").value = url + version + "/";
-	        input_name.value = "";
-        }
-        input_name.oninput = function () {
-            document.getElementById("new_store_link").value = url + version + "/" + input_name.value;
-        }
     </script>
 
 </body>
