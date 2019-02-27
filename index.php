@@ -53,6 +53,8 @@ class OpencartInstaller {
 
     private $db;
 
+    private $unused_db = array();
+
 
     public function __construct() {
         if (is_file('config.php')) {
@@ -92,7 +94,7 @@ class OpencartInstaller {
 
         } elseif (isset($_POST['delete_store'])) {
 
-            $this->deleteStore($_POST['delete_store']);
+            $this->deleteStore($_POST);
 
         } elseif (isset($_POST['delete_database'])) {
 
@@ -104,11 +106,11 @@ class OpencartInstaller {
     }
 
     // Delete
-    private function deleteStore($store) {
-        $this->remove_dir($store);
-        if(isset($store) && $store != ''){
-            $this->db->query("DROP DATABASE ".$store);
-            echo 'Table database '.$store;
+    private function deleteStore($post) {
+        $this->remove_dir($post['delete_store']);
+        if(isset($post['delete_database']) && $post['delete_database']){
+            $this->db->query("DROP DATABASE ".$post['delete_database']);
+            echo 'Table database '.$post['delete_database'];
         }
     }
 
@@ -175,6 +177,9 @@ class OpencartInstaller {
             $target_url =$download['download'];
             $this->installShopunity($target_url);
         }
+
+        // Delete install folder
+        $this->remove_dir(DESTINATION. 'install');
 
         echo 'all created';
     }
@@ -395,7 +400,7 @@ class OpencartInstaller {
     }
 
 
-    // Output
+    // Get data for output
     private function getAllFolders() {
         $results = scandir('./');
         $folders = array();
@@ -439,7 +444,28 @@ class OpencartInstaller {
                 $folders[$folder] = $sub_folders;
             }
         }
+
+        $this->setUnusedDb($folders);
+
         return $folders;
+    }
+
+    private function setUnusedDb($folders) {
+        // Get all db
+        $db_list = $this->getAllDatabases();
+
+        foreach ($db_list as $key => $db) {
+            foreach ($folders as $shops) {
+                foreach ($shops as $shop) {
+                    if ($shop['db'] === $db) {
+                        unset($db_list[$key]);
+                    }
+                }
+            }
+        }
+
+        $this->unused_db = $db_list;
+
     }
 
     private function getAllDatabases() {
@@ -457,80 +483,104 @@ class OpencartInstaller {
         return $db_list;
     }
 
+
+    // Html
     private function showPage() {
         $folders = $this->getAllFolders();
-        $db_list = $this->getAllDatabases();
+        $db_list = $this->unused_db;
         krsort($folders);
-        $html = '<html lang="en">
-<head>
-    <link href="http://fonts.googleapis.com/css?family=PT+Sans:400,700,400italic,700italic&subset=latin,cyrillic-ext" rel="stylesheet" type="text/css"/>
-    <link href="https://dreamvention.github.io/RipeCSS/css/ripe.css" rel="stylesheet">
-    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-GJzZqFGwb1QTTN6wy59ffF1BuGJpLSa9DkKMp0DgiMDm4iYMj70gZWKYbI706tWS" crossorigin="anonymous">
-    <title>Store Manager</title>
-</head>
-<body>
-    <style>
-    body {
-        background-color:#F6F9FC;
-    }
-    .header{
-        position:fixed;
-        height:90px;
-        padding:5px 10px;
-        width:100%;
-        background: #F6F9FC;
-        z-index:1000;
-        border-bottom:1px solid #dfe4e8;
-    }
-    .header .logo{
-        display: block;
-        padding: 6px;
-        float: left;
-    }
-    .header .logo img{
-        display: block;
-    }
-    .header .form{
-        display: block;
-        padding: 20px 30px;
-        float: left;
-    }
-    .header .store-link{
-        padding: 20px;
-        float: left;
-    }
-    .content{
-        padding: 30px;
-        padding-top:120px;
-    }
-    .hide {
-        display: none;
-    }
-    .link-shopunity:hover {
-        text-decoration: none;
-    }
-    .preloader-wrap{
-        position: fixed;
-        width: 100%;
-        height: 100%;
-        z-index: 1000;
-        background: rgba(0,0,0,0.6);
-    }
-    
-    .header .ve-label{
-        margin: 0px 10px ;
+        return '
+            <html lang="en">
+                <head>
+                    <link href="http://fonts.googleapis.com/css?family=PT+Sans:400,700,400italic,700italic&subset=latin,cyrillic-ext" rel="stylesheet" type="text/css"/>
+                    <link href="https://dreamvention.github.io/RipeCSS/css/ripe.css" rel="stylesheet">
+                    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-GJzZqFGwb1QTTN6wy59ffF1BuGJpLSa9DkKMp0DgiMDm4iYMj70gZWKYbI706tWS" crossorigin="anonymous">
+                    <title>Store Manager</title>
+                </head>
+                <body> '.$this->getBody($folders, $db_list).' </body>
+            </html>';
     }
 
-    .header .ve-checkbox{
-        margin-bottom:5px;
+    private function getBody($folders, $db_list) {
+        return '
+            <style>
+                .preloader-wrap {
+                    position: fixed;
+                    width: 100%;
+                    height: 100%;
+                    z-index: 1000;
+                }
+            </style>
+            <div class="preloader-wrap hide">
+                <span class="preloader"></span>
+            </div>
+            <div id="wrapper"> 
+                ' . $this->getStyle() . $this->getHeader() . $this->getContent($folders, $db_list) . $this->getFooter() . $this->getScripts() . '
+            </div>
+        ';
     }
-</style>
-    
-    <div class="preloader-wrap hide">
-        <span class="preloader"></span>
-    </div>
-    <div id="wrapper">
+
+    private function getStyle() {
+        return '
+            <style>
+                body {
+                    background-color:#F6F9FC;
+                }
+                .hide {
+                    display: none;
+                }
+            </style>';
+    }
+
+    private function getHeader() {
+        $version_list = '';
+        foreach($this->versions as $version){
+            $version_list .= '<option value="'.$version["code"].'">'.$version["version"].'</option>';
+        }
+        $header = '
+        <style>
+            .header {
+                position:fixed;
+                height:90px;
+                padding:5px 10px;
+                width:100%;
+                background: #F6F9FC;
+                z-index:1000;
+                border-bottom:1px solid #dfe4e8;
+            }
+            .header .logo {
+                display: block;
+                padding: 6px;
+                float: left;
+            }
+            .header .logo img {
+                display: block;
+            }
+            .header .form {
+                display: block;
+                padding: 20px 30px;
+                float: left;
+            }
+            .header .store-link {
+                padding: 20px;
+                float: left;
+            }
+            .header .search {
+                display: block;
+                padding: 15px 30px;
+                float: right;
+            }
+            .icon {
+                margin-top: 14px;
+            }
+            .header .ve-label{
+                margin: 0 10px;
+            }
         
+            .header .ve-checkbox{
+                margin-bottom:5px;
+            }
+        </style>
         <!-- Store Creator -->
         <div class="header">   
             <a class="logo" href="https://shopunity.net">
@@ -539,236 +589,312 @@ class OpencartInstaller {
             <form id="form" action="" method="post" class="form">
                 <div class="ve-field ve-field--inline">
                     <label for="input_version" class="ve-label">OC version:</label>
-                    <select class="ve-input ve-input--lg"  name="version" id="input_version" onchange="changeVersion()">';
-foreach($this->versions as $version){
-$html .= '<option value="'.$version["code"].'">'.$version["version"].'</option>';
-}
-$html .= '              </select>
-                    <label class="ve-label" for="input_name"> Codename:</label>
-                    <input class="ve-input ve-input--lg"  type="text" name="name" id="input_name"/>
-                    <span class="ve-btn ve-btn--success ve-btn--lg submit-btn" id="submit">Create Store</span>
-                    <label class="ve-checkbox ve-label" for="shopunity"> <input type="checkbox" checked  class="ve-input" id="shopunity" name="shopunity"><i></i> Install Shopunity</label>
+                    <select class="ve-input ve-input--lg"  name="version" id="input_version">'.$version_list.'</select>
+                    <label class="ve-label" for="store_name"> Codename:</label>
+                    <input class="ve-input ve-input--lg"  type="text" id="store_name" name="name"/>
+                    <span class="ve-btn ve-btn--success ve-btn--lg" id="submit">Create Store</span>
+                    <label class="ve-checkbox ve-label" for="shopunity"><input type="checkbox" checked  class="ve-input" id="shopunity" name="shopunity"><i></i> Install Shopunity</label>
                 </div>
-                
             </form>
             <div class="store-link hide">
-                <a href="" id="link_to_shop"><span class="ve-btn ve-btn--success ve-btn--lg submit-btn ">Go to Store</span></a>
+                <a href="" id="link_to_shop"><span class="ve-btn ve-btn--success ve-btn--lg">Go to Store</span></a>
             </div>
-        </div>
-        <div class="content">
-            <div class="row" id="pointerEventsShops">';
-            $i = 1;
-            foreach ($folders as $version => $shops) {
-                if (!$shops == null) {
-                    $html .= '<div class="ve-col-3">
-                                <div class="ve-card">
-                                     <div class="ve-card__header">
-                                        <h2 class="ve-h3">'.$version.'</h2>
-                                    </div>
-                                    <div class="ve-list ve-list--borderless">';
-                    foreach ($shops as $shop) {
-                        // Git
-                        if ($shop["git"]) {
-                            $a_git = ' <a href="'.$shop["git"].'" target="_blank" class="ve-btn ve-btn--default ve-btn--sm" title="'.$shop["git"].'">Git</a>';
-                        } else {
-                            $a_git = '';
-                        }
-
-                        // Shop link
-                        if (!$shop["db"]){
-                            $shop_link_class = 'class="not-working"';
-                        } else {
-                            $shop_link_class = "";
-                        }
-
-                        // Delete Store button
-                        $delete_but = '<a class="delete delete-store ve-btn ve-btn--danger ve-btn--sm" data-store="'.$shop["path"].'" data-database="'.$shop["db"].'">X</a>';
-
-                        // Database
-                        $database = $shop['db'];
-                        if (empty($shop["db"])) {
-                            $database = 'Db: none';
-                        }
-
-                        // Output
-                        $html .= '   <div class="ve-list__item">
-                                        <div>
-                                            <span style="padding-left: 0px; flex: 0;">'.$a_git.'</span>
-                                            <div class="text-left"><a href="'.$shop["link"].'" title="'.$shop["db"].'">'.$shop['name'].'</a><br/>
-                                            <span class="small" style="margin-top: 5px; display:inline-block">'.$database.'</span>
-                                            </div>
-                                           
-                                           <span class="text-right">'.$delete_but.'</span>
-                                        </div>
-                                    </div>';
-                        //$html .=  '<li style="margin-bottom: 20px">'.$a_git.$shop_link.$delete_but.$database.'</li>';
-                        $i++;
-                    }
-                    $html .= '</div></div></div>';
-                }
-            }
-            $html .='
-                </div>
-                <div class="row" id="pointerEventsDb">
-                    <!-- Databases -->
-                    <div class="ve-col-12" >
-                        <div class="ve-card">
-                            <div class="ve-card__header">
-                                <h2 class="ve-h2">Unused databases</h2>
-                            </div>
-                            <hr class="ve-hr"/>
-                            <div class="ve-card__section"  style="padding-top: 30px">
-                                <div class="ve-col-12">
-                                    <ol style="columns: 4;">';
-            foreach ($db_list as $db) {
-                $html .= '<li style="margin-bottom: 10px; padding-right:40px;"><span style="cursor: text;">'.$db.'</span>
-                            <a style="" class="delete delete-database ve-btn ve-btn--danger ve-pull-right" data-database="'.$db.'"><span style="font-size: 10px;">X</span></a></li>';
-            }
-            $html .= '        </ol>
-                            </div>
-                        </div>
+            <div class="search text-right">
+                <div>
+                    <div class="ve-input-group ve-input-group--hg">
+                        <label class="ve-input-group__addon"><i class="icon fas fa-search"></i></label>
+                        <input class="ve-input" type="text" placeholder="Search" id="search">
                     </div>
                 </div>
             </div>
-            <div class="footer ve-col-11" style="margin: 0 auto; color: #929292; text-align: center;">
+        </div>';
+        return $header;
+    }
+
+    private function getContent($folders, $db_list) {
+
+        return '
+            <style>
+                .content{
+                    padding: 120px 30px 30px 30px;
+                }
+                .content .db-div {
+                    margin-top: 50px;
+                }
+            </style>
+            <div class="content">
+                <div class="row" id="pointerEventsShops">
+                    '.$this->getFolders($folders).'
+                </div>
+                <div class="row db-div" id="pointerEventsDb">
+                    '.$this->getDatabases($db_list).'
+                </div>
+            </div>';
+    }
+
+    private function getFolders($folders) {
+        $output = '';
+        foreach ($folders as $version => $shops) {
+            if (!$shops == null) {
+                $output .= '
+                    <div class="ve-col-3">
+                        <div class="ve-card stores-for-search">
+                            <div class="ve-card__header">
+                                <h2 class="ve-h3">'.$version.'</h2>
+                            </div>
+                            <div class="ve-list ve-list--borderless">
+                                '.$this->getShops($shops).'
+                            </div>
+                        </div>
+                    </div>';
+            }
+        }
+        return $output;
+    }
+
+    private function getShops($shops) {
+        $output = '
+            <style>
+                .span-git {
+                    padding-left: 0;
+                    flex: 0;
+                }
+                .span-db {
+                    margin-top: 5px; 
+                    display: inline-block
+                }
+            </style>';
+        foreach ($shops as $shop) {
+            // Git
+            if ($shop["git"]) {
+                $a_git = ' <a href="'.$shop["git"].'" target="_blank" class="ve-btn ve-btn--default ve-btn--sm" title="'.$shop["git"].'">Git</a>';
+            } else {
+                $a_git = '';
+            }
+
+            // Shop link
+            if (!$shop["db"]){
+                $shop_link_class = 'class="not-working"';
+            } else {
+                $shop_link_class = "";
+            }
+
+            // Delete Store button
+            $delete_but = '<a onclick="deleteStore()" class="delete delete-store ve-btn ve-btn--danger ve-btn--sm" data-store="'.$shop["path"].'" data-database="'.$shop["db"].'">X</a>';
+
+            // Database
+            $database = $shop['db'];
+            if (empty($shop["db"])) {
+                $database = 'Db: none';
+            }
+
+            // Output
+            $output .= '
+                <div class="ve-list__item">
+                    <div>
+                        <span class="span-git">'.$a_git.'</span>
+                        <div class="text-left"><a href="'.$shop["link"].'" title="'.$shop["db"].'">'.$shop['name'].'</a><br/>
+                            <span class="small span-db">'.$database.'</span>
+                        </div>
+                        <span class="text-right">'.$delete_but.'</span>
+                    </div>
+                </div>';
+        }
+        return $output;
+    }
+
+    private function getDatabases($db_list) {
+        if (empty($db_list)) {
+            return '';
+        }
+        return '<!-- Databases -->
+            <style>
+               .ve-card__section {
+                    margin-top: 20px;
+               }
+                .db-div div ol {
+                    columns: 4;
+                }
+            </style>
+            <div class="ve-col-12" >
+                <div class="ve-card">
+                    <div class="ve-card__header">
+                        <h2 class="ve-h2">Unused databases</h2>
+                    </div>
+                    <hr class="ve-hr"/>
+                    <div class="ve-card__section">
+                        <div class="ve-col-12">
+                            <ol id="ol_db">'.$this->getDb($db_list).'</ol>
+                        </div>
+                    </div>
+                </div>
+            </div>';
+    }
+
+    private function getDb($db_list) {
+        $output = '
+            <style>
+                .li-db {
+                    margin-bottom: 10px; 
+                    padding-right:40px;
+                }
+                .li-db a span {
+                    font-size: 10px;
+                }
+            </style>
+        ';
+
+        $class = 'item_for_search';
+
+        foreach ($db_list as $db) {
+            $output .= '
+                <li class="li-db '.$class.'">
+                    <div class="row">
+                        <span class="ve-col-10">'.$db.'</span>
+                        <span class="ve-col-2">
+                            <a onclick="deleteDb()" class="ve-btn ve-btn--danger delete delete-database" data-database="'.$db.'">
+                                <span>X</span>
+                            </a>
+                        </span>
+                    </div>
+                </li>';
+        }
+        return $output;
+    }
+
+    private function getFooter() {
+        $footer = '
+            <style>
+                .link-shopunity:hover {
+                    text-decoration: none;
+                }
+                .footer {
+                    margin: 0 auto; 
+                    color: #929292; 
+                    text-align: center;
+                }
+                .footer .version {
+                    margin: 10px 0 5px 0;
+                }
+                .footer .version span {
+                    margin-left: 5px;
+                }
+                .footer .powered {
+                    margin-bottom: 20px;
+                }
+            </style>
+            <div class="ve-col-11 footer">
                 <hr class="ve-hr">
-                <div style="margin: 10px 0 5px 0">OpencartInstaller version:  <span style="margin-left: 5px">'.$this->OIversion .'</span></div>
-                <div style="margin-bottom: 20px">
+                <div class="version">Opencart Installer version:  
+                    <span>'.$this->OIversion .'</span>
+                </div>
+                <div class="powered">
                     Powered by <a class="link-shopunity" href="https://shopunity.net">Shopunity.net</a>
                 </div>
-            </div>
-        </div>
-    </div>
-    <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
-    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/spin.js/2.3.2/spin.min.js"></script>
-    <script type="text/javascript" src="//igorescobar.github.io/jQuery-Mask-Plugin/js/jquery.mask.min.js"></script>
-    <script type="text/javascript">
-        (function($) {
-            $.fn.spin = function(opts, color) {
-                var presets = {
-                    "tiny": { lines: 8, length: 2, width: 2, radius: 3 },
-                    "small": { lines: 8, length: 4, width: 3, radius: 5 },
-                    "large": { lines: 10, length: 8, width: 4, radius: 8 }
-                };
-                if (Spinner) {
-                    return this.each(function() {
-                        var $this = $(this),
-                            data = $this.data();
+            </div>';
+        return $footer;
+    }
 
-                        if (data.spinner) {
-                            data.spinner.stop();
-                            delete data.spinner;
-                        }
-                        if (opts !== false) {
-                            if (typeof opts === "string") {
-                                if (opts in presets) {
-                                    opts = presets[opts];
-                                } else {
-                                    opts = {};
-                                }
-                                if (color) {
-                                    opts.color = color;
-                                }
+    private function getScripts() {
+        $url = 'http://'.$_SERVER["HTTP_HOST"] . rtrim(dirname($_SERVER["SCRIPT_NAME"]), "/.\\") .'/';
+
+        return '
+        <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+        <script defer src="https://use.fontawesome.com/releases/v5.7.2/js/all.js" integrity="sha384-0pzryjIRos8mFBWMzSSZApWtPl/5++eIfzYmTgBBmXYdhvxPc+XcFEk+zJwDgWbP" crossorigin="anonymous"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/3.4.2/fuse.min.js"></script>
+        <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/spin.js/2.3.2/spin.min.js"></script>
+        <script type="text/javascript" src="//igorescobar.github.io/jQuery-Mask-Plugin/js/jquery.mask.min.js"></script>
+        <script type="text/javascript"> 
+            (function($) {
+                $.fn.spin = function(opts, color) {
+                    var presets = {
+                        "tiny": { lines: 8, length: 2, width: 2, radius: 3 },
+                        "small": { lines: 8, length: 4, width: 3, radius: 5 },
+                        "large": { lines: 10, length: 8, width: 4, radius: 8 }
+                    };
+                    if (Spinner) {
+                        return this.each(function() {
+                                var $this = $(this),
+                                data = $this.data();
+    
+                            if (data.spinner) {
+                                data.spinner.stop();
+                                delete data.spinner;
                             }
-                            data.spinner = new Spinner($.extend({color: $this.css("color")}, opts)).spin(this);
-                        }
-                    });
-                } else {
-                    throw "Spinner class not available.";
-                }
-            };
-        })(jQuery);
-    </script>
-    <script type="text/javascript">
+                            if (opts !== false) {
+                                if (typeof opts === "string") {
+                                    if (opts in presets) {
+                                        opts = presets[opts];
+                                    } else {
+                                        opts = {};
+                                    }
+                                    if (color) {
+                                        opts.color = color;
+                                    }
+                                }
+                                data.spinner = new Spinner($.extend({color: $this.css("color")}, opts)).spin(this);
+                            }
+                        });
+                    } else {
+                        throw "Spinner class not available.";
+                    }
+                };
+            })(jQuery);
+        </script>
+        <script type="text/javascript">
             $(document).ready(function(){
                 $(".preloader").spin({ color:"black"});
-                $("#input_name").mask("d_AAAAAAAAAAAAAAAAAAAA", {"translation": {
-                        A: {pattern: /[\_A-Za-z0-9]/}
-                    }
+                $("#store_name").mask("d_AAAAAAAAAAAAAAAAAAAA", {"translation": {
+                    A: {pattern: /[\_A-Za-z0-9]/}
+                }
                 });
-            });';
-        if (DEBUG == 1) {
-            $html .= '$("#submit").on("click",function(){
-                window.location.href = "http://'.$_SERVER["HTTP_HOST"] . rtrim(dirname($_SERVER["SCRIPT_NAME"]), "/.\\") .'/index.php?name=" + $("#input_name").val() + "&version=" + $("#input_version").val()});';
-        } else {
-            $html .= '
-                $("#submit").on("click",function(){
-                    $("#form").slideUp("slow");
+            });
+            
+            '.$this->getSubmitScript($url).'
+            
+            function deleteDb() {
+            	var delete_database = confirm("Are you sure, you want to delete this database?");
+                if (delete_database === true) {
+    
                     $.ajax({
-                        url: "http://'.$_SERVER["HTTP_HOST"] . rtrim(dirname($_SERVER["SCRIPT_NAME"]), "/.\\") .'/index.php",
+                        url: "http://'.$_SERVER["HTTP_HOST"] . rtrim(dirname($_SERVER["SCRIPT_NAME"]), " /.\\") .'/index.php",
                         type: "post",
-                        data: $("#form").serialize(),
+                        data: "delete_database=" + event.target.parentNode.children[0].getAttribute("data-database"),
                         dataType: "html",
                         beforeSend: function() {
                             $(".preloader-wrap").removeClass("hide");
-                            $("#form").addClass("hide");
-                            document.getElementById("pointerEventsShops").style.pointerEvents = "none";
-                            document.getElementById("pointerEventsDb").style.pointerEvents = "none";
                         },
                         complete: function() {
                             $(".preloader-wrap").addClass("hide");
-                            $("#form").addClass("hide");
-                            document.getElementById("pointerEventsShops").style.pointerEvents = "auto";
-                            document.getElementById("pointerEventsDb").style.pointerEvents = "auto";
                         },
                         success: function(html) {
-                            $("#link_to_shop").attr("href", "http://'.$_SERVER["HTTP_HOST"] . rtrim(dirname($_SERVER["SCRIPT_NAME"]), "/.\\") . "/".'"+$("#input_version").val() + "/"+$("#input_name").val());
-                            $(".store-link").removeClass("hide");
+                        	location.reload(true);
                         },
                         error: function(xhr, ajaxOptions, thrownError) {
                             console.log(thrownError + "\r\n" + xhr.statusText + "\r\n" + xhr.responseText);
                         }
                     });
-                });';
-        }
-        $html .= '$(".delete-database").click(function() {
-                var delete_database = confirm("Are you sure, you want to delete this database?");
-                if (delete_database === true) {
-
-                    var database = $(this);
-
-                     $.ajax({
-                         url: "http://'.$_SERVER["HTTP_HOST"] . rtrim(dirname($_SERVER["SCRIPT_NAME"]), " /.\\") .'/index.php",
-                         type: "post",
-                         data: "delete_database=" + database.attr("data-database"),
-                         dataType: "html",
-                         beforeSend: function() {
-                            $(".preloader-wrap").removeClass("hide");
-                         },
-                         complete: function() {
-                            $(".preloader-wrap").addClass("hide");
-                         },
-                         success: function(html) {
-                            database.parent().remove();
-                         },
-                         error: function(xhr, ajaxOptions, thrownError) {
-                            console.log(thrownError + "\r\n" + xhr.statusText + "\r\n" + xhr.responseText);
-                         }
-                     });
-                 }
-
-            });
-            $(".delete-store").click(function(){
+                }
+            }
+            
+            function deleteStore() {
                 var delete_store = confirm("Are you sure, you want to delete this store?");
                 if (delete_store === true) {
-
-                    var store = $(this);
 
                     $.ajax({
                         url: "http://'.$_SERVER["HTTP_HOST"] . rtrim(dirname($_SERVER["SCRIPT_NAME"]), "/.\\") .'/index.php",
                         type: "post",
-                        data: "delete_store=" + store.attr("data-store") + "&delete_database=" + store.attr("data-database"),
+                        data: "delete_store=" + event.target.parentNode.children[0].getAttribute("data-store") + 
+                            "&delete_database=" + event.target.parentNode.children[0].getAttribute("data-database"),
                         dataType: "html",
                         beforeSend: function() {
                             $(".preloader-wrap").removeClass("hide");
-
                         },
                         complete: function() {
                             $(".preloader-wrap").addClass("hide");
-
                         },
                         success: function(html) {
-                            store.parent().remove();
+                        console.log(html);
                             location.reload(true);
                         },
                         error: function(xhr, ajaxOptions, thrownError) {
@@ -776,13 +902,265 @@ $html .= '              </select>
                         }
                     });
                 }
-            })
-            
-    </script>
+            }
 
-</body>
-</html>';
-        return $html;
+        </script>
+        
+        <!-- Search -->
+        <script>
+            $(document).ready(function(){ 
+            	var stores = "";
+            	sessionStorage.removeItem("db");
+            	$(".search").keyup(function(){
+            		const value = $("#search").val();
+            		
+                    if (stores === "") {
+                        stores = getStores();
+                    }
+                    searchStores(value, stores);
+                    searchDatabases(value);
+            		
+            	});
+            });
+            
+            function getStores() {
+                var items = $(".stores-for-search");
+                let data = {};
+                for (let i = 0; i < items.length; i++) {
+                    let version = items[i].children[0].children[0].innerText;
+                    data[version] = {}
+                  
+                    for (let r = 1; r < items[i].children[1].children.length; r++) {
+                        let name = items[i].children[1].children[r].children[0].children[1].children[0].innerText;
+                        let db = items[i].children[1].children[r].children[0].children[1].children[2].innerText;
+                        let link = items[i].children[1].children[r].children[0].children[1].children[0].href;
+                        let path = items[i].children[1].children[r].children[0].children[2].children[0].getAttribute("data-store");
+                        data[version][r-1] = {
+                            name: name,
+                            db: db,
+                            link: link,
+                            path: path,
+                        }
+                    }
+                }
+                
+                return data;
+            }
+            
+            function searchStores(value, stores) {
+            	const div = $("#pointerEventsShops");
+            	div.html("")
+            	
+            	if (value === "") {
+            		var result = stores
+            	} else {
+            		let names = [];
+                    let i = 0
+                    for (let version in stores) {
+                        for (let key in stores[version]) {
+                            names[i] = stores[version][key].name;
+                            i++;
+                        }
+                    }
+                    
+                    names.reverse();
+                    
+                    var options = {
+                            shouldSort: true,
+                            threshold: 0.6,
+                            location: 0,
+                            distance: 100,
+                            maxPatternLength: 32,
+                            minMatchCharLength: 1,
+                            keys: [
+                                "title",
+                                "author.firstName"
+                            ]
+                        };
+                    var fuse = new Fuse(names, options);
+                    result = fuse.search(value);
+                    
+                    var mas_name = [];
+                    for (let i = 0; i < result.length; i++) {
+                        mas_name.push(names[result[i]])
+                    }
+                    mas_name.sort();
+                    mas_name = $.unique(mas_name)
+                    
+                    var result = {}
+                    var k = 0;
+                    for (let i = 0; i < mas_name.length; i++ ) {
+                        for (let version in stores) {
+                            for (let key in stores[version]) {
+                                if (mas_name[i] === stores[version][key].name) {
+                                    if (!result[version]) {
+                                        result[version] = {}
+                                    }
+                                    result[version][k] = stores[version][key]
+                                    k++;
+                                }
+                            }
+                        }
+                    }
+            	}
+                
+                var versions = Object.keys(result);
+                versions.reverse();
+            	
+            	for (let t = 0; t < versions.length; t++) {
+            		
+            		var keys = Object.keys(result[versions[t]]);
+            		var stores = "";
+            		for (let l = 0; l < keys.length; l++) {
+            			let link = result[versions[t]][keys[l]].link
+            			stores += `<div class="ve-list__item">
+                                <div>
+                                    <span class="span-git"></span>
+                                    <div class="text-left">
+                                        <a href="` + link + `" 
+                                            title="` + result[versions[t]][keys[l]].db + `">` + result[versions[t]][keys[l]].name + `  
+                                        </a><br/>
+                                        <span class="small span-db">` + result[versions[t]][keys[l]].db + `</span>
+                                    </div>
+                                    <span class="text-right">
+                                        <a class="delete delete-store ve-btn ve-btn--danger ve-btn--sm" 
+                                            data-store="` + result[versions[t]][keys[l]].path + `"  onclick="deleteStore()"
+                                            data-database="` + result[versions[t]][keys[l]].db + `">X</a>
+                                    </span>
+                                </div>
+                            </div>`
+            		} 
+            		div.append(`<style>
+                                .span-git {
+                                    padding-left: 0;
+                                    flex: 0;
+                                }
+                                .span-db {
+                                    margin-top: 5px; 
+                                    display: inline-block
+                                }
+                            </style>
+                    <div class="ve-col-3">
+                        <div class="ve-card stores-for-search">
+                            <div class="ve-card__header">
+                                <h2 class="ve-h3">` + versions[t] + `</h2>
+                            </div>
+                            <div class="ve-list ve-list--borderless">` + stores + `</div>
+                        </div>
+                    </div>`)
+            	}
+            	
+            	
+            }
+            
+            function searchDatabases(value) {
+                const ol_db = $("#ol_db")
+                
+                if (!sessionStorage.getItem("db")) {
+                	var items = $(".item_for_search");
+                	var name = [];
+                    for (let i = 0; i < items.length; i++) {
+                        name[i] = items[i].children[0].children[0].innerText
+                    }
+                	sessionStorage.setItem("db", name);
+                }
+                
+                ol_db.html("");
+                
+                const data = sessionStorage.getItem("db").split(",");
+                
+                var result = [];
+                if (value === "") {
+                    for (let i = 0; i < data.length; i++) {
+                        result[i] = i 
+                    }
+                } else {
+                    var options = {
+                        shouldSort: true,
+                        threshold: 0.6,
+                        location: 0,
+                        distance: 100,
+                        maxPatternLength: 32,
+                        minMatchCharLength: 1,
+                        keys: [
+                            "title",
+                            "author.firstName"
+                        ]
+                    };
+                    var fuse = new Fuse(data, options);
+                    result = fuse.search(value);
+                }
+                
+                for (let i = 0; i < result.length; i++) {
+                    ol_db.append(`<style>
+                            .li-db {
+                                margin-bottom: 10px; 
+                                padding-right:40px;
+                            }
+                            .li-db a span {
+                                font-size: 10px;
+                            }
+                        </style>
+                        <li class="li-db">
+                            <div class="row">
+                                <span class="ve-col-10">` + data[result[i]] + `</span>
+                                <span class="ve-col-2">
+                                    <a onclick="deleteDb()" class="ve-btn ve-btn--danger delete delete-database" data-database=` + data[result[i]] + `>
+                                        <span>X</span>
+                                    </a>
+                                </span>
+                            </div>
+                        </li>`)
+                }
+            }
+            
+        </script>
+        ';
+    }
+
+    private function getSubmitScript($url) {
+        $script = '';
+
+        if (DEBUG == 1) {
+            $script .= '$("#submit").on("click",function(){
+                            window.location.href = "'.$url.'index.php?name=" + $("#store_name").val() + "&version=" + $("#input_version").val()
+                        });';
+        } else {
+            $script .= '
+                $("#submit").on("click",function(){
+                    if ($("#store_name")[0].value !== "") {
+                    
+                        $("#form").fadeToggle("slow");
+                        
+                        $.ajax({
+                            url: "'.$url.'index.php",
+                            type: "post",
+                            data: $("#form").serialize(),
+                            dataType: "html",
+                            beforeSend: function() {
+                                $(".preloader-wrap").removeClass("hide");
+                                $("#wrapper").fadeTo("slow", "0.3");
+                                $("#pointerEventsShops").css("pointerEvents", "none");
+                                $("#pointerEventsDb").css("pointerEvents", "none");
+                            },
+                            complete: function() {
+                                $(".preloader-wrap").addClass("hide");
+                                $("#wrapper").fadeTo("slow", "1");
+                                $("pointerEventsShops").css("pointerEvents", "auto");
+                                $("pointerEventsDb").css("pointerEvents", "auto");
+                            },
+                            success: function(html) {
+                                $("#link_to_shop").attr("href", "'.$url.'"+$("#input_version").val() + "/"+$("#store_name").val());
+                                    $(".store-link").fadeToggle("slow");
+                                },
+                                error: function(xhr, ajaxOptions, thrownError) {
+                                console.log(thrownError + "\r\n" + xhr.statusText + "\r\n" + xhr.responseText);
+                            }
+                        });
+                    }
+                });';
+        }
+        return $script;
     }
 
 
