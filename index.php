@@ -1,11 +1,7 @@
 <?php
-
 $opencartInstaller = new OpencartInstaller();
-
 class OpencartInstaller {
-
     private $OIversion = '1.0.0';
-
     private $versions = array(
         array(
             'code' => '303',
@@ -48,63 +44,41 @@ class OpencartInstaller {
             'version' => '2.0.1.1',
         ),
     );
-
     private $installShopunity = true;
-
     private $db;
-
     private $unused_db = array();
-
-
     public function __construct() {
         if (is_file('config.php')) {
             require_once('config.php');
         }
-
         ini_set('max_execution_time', 960);
-
         $this->connectMysqli();
-
         if (!empty($_POST) || !empty($_GET)) {
             $this->queryDefinition();
         }
-
         echo $this->showPage();
-
     }
-
     private function queryDefinition() {
         if (isset($_POST['name']) || isset($_GET['name'])) {
-
             if (!isset($_POST['shopunity'])) {
                 $this->installShopunity = false;
             }
-
             if(DEBUG == '1'){
                 $name = $_GET['name'];
                 $version = $_GET['version'];
-
             }else{
                 $name = $_POST['name'];
                 $version = $_POST['version'];
-
             }
-
             $this->createStore($name, $version);
-
         } elseif (isset($_POST['delete_store'])) {
-
             $this->deleteStore($_POST);
-
         } elseif (isset($_POST['delete_database'])) {
-
             $this->deleteDatabase($_POST['delete_database']);
-
         } else {
             exit('ERROR');
         }
     }
-
     // Delete
     private function deleteStore($post) {
         $this->remove_dir($post['delete_store']);
@@ -113,77 +87,57 @@ class OpencartInstaller {
             echo 'Table database '.$post['delete_database'];
         }
     }
-
     private function deleteDatabase($database) {
         $this->db->query("DROP DATABASE ".$database);
         echo 'Table database '.$database;
     }
-
-
     // Creating store
     private function createStore($name, $version) {
         $key = array_search($version, array_column($this->versions, 'code'));
-
         define('VERSION', $version);
         define('VERSION_FULL', $this->versions[$key]['version']);
-
         $name = str_replace(" ","_",$name);
         $parts = explode('_', $name);
         unset($parts[0]);
-
         $path = VERSION.'/'.$name;
-
         // HTTP
         define('HTTP_SERVER', 'http://' . $_SERVER['HTTP_HOST'] . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/.\\') . '/' . $path . '/');
         define('HTTP_OPENCART', 'http://' . $_SERVER['HTTP_HOST'] . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/.\\'). '/' .$path . '/');
         define('HTTPS_OPENCART', 'http://' . $_SERVER['HTTP_HOST'] . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/.\\'). '/' .$path . '/');
-
         $realpath = implode('/', explode('\\', realpath(dirname(__FILE__))));
         // DIR
         define('DIR_OPENCART', str_replace('\'', '/', $realpath) . '/'.$path.'/');
         define('DIR_SOURCE', str_replace('\'', '/', $realpath) . '/'.$path.'/upload/');
         define('DESTINATION', $path.'/');
         define('SOURCE', $path.'/upload/');
-
         // create database
         $this->createDatabase();
-
         // create a directory
         if (!file_exists('./'.$path.'/')) {
             mkdir('./'.$path .'/', 0755, true);
         }
-
         // upload files
         $this->uploadFiles($path);
-
         // move files
         $this->removeFiles();
-
         // give correct permissions
         $this->correctPermissions();
-
         // config.php definition
         $this->configDefinition();
-
         // admin config.php definition
         $this->adminConfigDefinition();
-
         //fill database
         $this->fillDatabase();
-
         // install shopunity
         if ($this->installShopunity) {
             $download = json_decode(file_get_contents(HTTP_API."extensions/d_shopunity/download?store_version=".VERSION_FULL),true);
             $target_url =$download['download'];
             $this->installShopunity($target_url);
         }
-
         // Delete install folder
         $this->remove_dir(DESTINATION. 'install');
-
         echo 'all created';
     }
-
     private function createDatabase() {
         $i = 0;
         do {
@@ -192,35 +146,26 @@ class OpencartInstaller {
             $db_exists = $this->db->query("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '" . $db_name . "'");
             $result = $db_exists->row;
         } while ($result);
-
         define('DB_DATABASE', $db_name);
-
         $this->db->create(DB_DATABASE);
     }
-
     private function uploadFiles($path) {
         if (!extension_loaded('zip')) {
             dl('zip.so');
         }
-
         $download = json_decode(file_get_contents(HTTP_API."extensions/opencart/download?store_version=".VERSION_FULL),true);
         $target_url =$download['download'];
-
         $file_zip = $path."/opencart.zip";
         $file_dest = $path."/";
-
         $this->download($target_url, $file_dest, $file_zip);
     }
-
     private function removeFiles() {
         $this->move_dir(SOURCE, DESTINATION);
         $this->remove_dir(SOURCE);
-
         unlink(DESTINATION.'opencart.zip');
         unlink(DESTINATION.'config-dist.php');
         unlink(DESTINATION.'admin/config-dist.php');
     }
-
     private function correctPermissions() {
         $dirs = array(
             "system/cache" => 0755,
@@ -241,15 +186,12 @@ class OpencartInstaller {
             }
         }
     }
-
     private function configDefinition() {
         $output  = '<?php' . "\n";
         $output .= '// HTTP' . "\n";
         $output .= 'define(\'HTTP_SERVER\', \'' . HTTP_OPENCART . '\');' . "\n\n";
-
         $output .= '// HTTPS' . "\n";
         $output .= 'define(\'HTTPS_SERVER\', \'' . HTTPS_OPENCART . '\');' . "\n\n";
-
         $output .= '// DIR' . "\n";
         $output .= 'define(\'DIR_APPLICATION\', \'' . DIR_OPENCART . 'catalog/\');' . "\n";
         $output .= 'define(\'DIR_SYSTEM\', \'' . DIR_OPENCART. 'system/\');' . "\n";
@@ -258,34 +200,27 @@ class OpencartInstaller {
         $output .= 'define(\'DIR_TEMPLATE\', \'' . DIR_OPENCART . 'catalog/view/theme/\');' . "\n";
         $output .= 'define(\'DIR_CONFIG\', \'' . DIR_OPENCART . 'system/config/\');' . "\n";
         $output .= 'define(\'DIR_IMAGE\', \'' . DIR_OPENCART . 'image/\');' . "\n";
-
-
         if(VERSION >= 210){
             $output .= 'define(\'DIR_DOWNLOAD\', \'' . DIR_OPENCART . 'system/storage/download/\');' . "\n";
             $output .= 'define(\'DIR_CACHE\', \'' . DIR_OPENCART . 'system/storage/cache/\');' . "\n";
             $output .= 'define(\'DIR_LOGS\', \'' . DIR_OPENCART . 'system/storage/logs/\');' . "\n\n";
             $output .= 'define(\'DIR_MODIFICATION\', \'' . DIR_OPENCART . 'system/storage/modification/\');' . "\n";
             $output .= 'define(\'DIR_UPLOAD\', \'' . DIR_OPENCART . 'system/storage/upload/\');' . "\n";
-
         }elseif(VERSION >= 200){
             $output .= 'define(\'DIR_DOWNLOAD\', \'' . DIR_OPENCART . 'system/download/\');' . "\n";
             $output .= 'define(\'DIR_CACHE\', \'' . DIR_OPENCART . 'system/cache/\');' . "\n";
             $output .= 'define(\'DIR_LOGS\', \'' . DIR_OPENCART . 'system/logs/\');' . "\n\n";
             $output .= 'define(\'DIR_MODIFICATION\', \'' . DIR_OPENCART . 'system/modification/\');' . "\n";
             $output .= 'define(\'DIR_UPLOAD\', \'' . DIR_OPENCART . 'system/upload/\');' . "\n";
-
         }else{
             $output .= 'define(\'DIR_DOWNLOAD\', \'' . DIR_OPENCART . 'download/\');' . "\n";
             $output .= 'define(\'DIR_CACHE\', \'' . DIR_OPENCART . 'system/cache/\');' . "\n";
             $output .= 'define(\'DIR_LOGS\', \'' . DIR_OPENCART . 'system/logs/\');' . "\n\n";
         }
-
         if(VERSION >=301){
             $output .= 'define(\'DIR_STORAGE\', DIR_SYSTEM . \'storage/\');' . "\n";
             $output .= 'define(\'DIR_SESSION\', \'' . DIR_OPENCART . 'system/storage/session/\');' . "\n\n";
         }
-
-
         $output .= '// DB' . "\n";
         $output .= 'define(\'DB_DRIVER\', \'' . addslashes(DB_DRIVER) . '\');' . "\n";
         $output .= 'define(\'DB_HOSTNAME\', \'' . addslashes(DB_HOSTNAME) . '\');' . "\n";
@@ -295,24 +230,19 @@ class OpencartInstaller {
         $output .= 'define(\'DB_PORT\', \'' . addslashes(DB_PORT) . '\');' . "\n";
         $output .= 'define(\'DB_PREFIX\', \'' . addslashes(DB_PREFIX) . '\');' . "\n";
         $output .= '?>';
-
         $file = fopen(DESTINATION . 'config.php', 'wb');
         fwrite($file, $output);
         fclose($file);
         chmod(DESTINATION."config.php", 0755);
-
     }
-
     private function adminConfigDefinition() {
         $output  = '<?php' . "\n";
         $output .= '// HTTP' . "\n";
         $output .= 'define(\'HTTP_SERVER\', \'' . HTTP_OPENCART . 'admin/\');' . "\n";
         $output .= 'define(\'HTTP_CATALOG\', \'' . HTTP_OPENCART . '\');' . "\n\n";
-
         $output .= '// HTTPS' . "\n";
         $output .= 'define(\'HTTPS_SERVER\', \'' . HTTPS_OPENCART . 'admin/\');' . "\n";
         $output .= 'define(\'HTTPS_CATALOG\', \'' . HTTPS_OPENCART . '\');' . "\n\n";
-
         $output .= '// DIR' . "\n";
         $output .= 'define(\'DIR_APPLICATION\', \'' . DIR_OPENCART . 'admin/\');' . "\n";
         $output .= 'define(\'DIR_SYSTEM\', \'' . DIR_OPENCART . 'system/\');' . "\n";
@@ -321,33 +251,27 @@ class OpencartInstaller {
         $output .= 'define(\'DIR_TEMPLATE\', \'' . DIR_OPENCART . 'admin/view/template/\');' . "\n";
         $output .= 'define(\'DIR_CONFIG\', \'' . DIR_OPENCART . 'system/config/\');' . "\n";
         $output .= 'define(\'DIR_IMAGE\', \'' . DIR_OPENCART . 'image/\');' . "\n";
-
-
         if(VERSION >= 210){
             $output .= 'define(\'DIR_DOWNLOAD\', \'' . DIR_OPENCART . 'system/storage/download/\');' . "\n";
             $output .= 'define(\'DIR_CACHE\', \'' . DIR_OPENCART . 'system/storage/cache/\');' . "\n";
             $output .= 'define(\'DIR_LOGS\', \'' . DIR_OPENCART . 'system/storage/logs/\');' . "\n\n";
             $output .= 'define(\'DIR_MODIFICATION\', \'' . DIR_OPENCART . 'system/storage/modification/\');' . "\n";
             $output .= 'define(\'DIR_UPLOAD\', \'' . DIR_OPENCART . 'system/storage/upload/\');' . "\n";
-
         }elseif(VERSION >= 200){
             $output .= 'define(\'DIR_DOWNLOAD\', \'' . DIR_OPENCART . 'system/download/\');' . "\n";
             $output .= 'define(\'DIR_CACHE\', \'' . DIR_OPENCART . 'system/cache/\');' . "\n";
             $output .= 'define(\'DIR_LOGS\', \'' . DIR_OPENCART . 'system/logs/\');' . "\n\n";
             $output .= 'define(\'DIR_MODIFICATION\', \'' . DIR_OPENCART . 'system/modification/\');' . "\n";
             $output .= 'define(\'DIR_UPLOAD\', \'' . DIR_OPENCART . 'system/upload/\');' . "\n";
-
         }else{
             $output .= 'define(\'DIR_DOWNLOAD\', \'' . DIR_OPENCART . 'download/\');' . "\n";
             $output .= 'define(\'DIR_CACHE\', \'' . DIR_OPENCART . 'system/cache/\');' . "\n";
             $output .= 'define(\'DIR_LOGS\', \'' . DIR_OPENCART . 'system/logs/\');' . "\n\n";
         }
-
         if(VERSION >=301){
             $output .= 'define(\'DIR_STORAGE\', DIR_SYSTEM . \'storage/\');' . "\n";
             $output .= 'define(\'DIR_SESSION\', \'' . DIR_OPENCART . 'system/storage/session/\');' . "\n\n";
         }
-
         $output .= 'define(\'DIR_CATALOG\', \'' . DIR_OPENCART . 'catalog/\');' . "\n\n";
         $output .= '// DB' . "\n";
         $output .= 'define(\'DB_DRIVER\', \'' . addslashes(DB_DRIVER) . '\');' . "\n";
@@ -357,21 +281,16 @@ class OpencartInstaller {
         $output .= 'define(\'DB_DATABASE\', \'' . addslashes(DB_DATABASE) . '\');' . "\n";
         $output .= 'define(\'DB_PORT\', \'' . addslashes(DB_PORT) . '\');' . "\n";
         $output .= 'define(\'DB_PREFIX\', \'' . addslashes(DB_PREFIX) . '\');' . "\n";
-
         if(VERSION >=300){
             $output .= '// OpenCart API' . "\n";
             $output .= 'define(\'OPENCART_SERVER\', \'https://www.opencart.com/\');' . "\n";
-
         }
-
         $output .= '?>';
-
         $file = fopen(DESTINATION. 'admin/config.php', 'wb');
         fwrite($file, $output);
         fclose($file);
         chmod(DESTINATION."admin/config.php", 0755);
     }
-
     private function fillDatabase() {
         $data = array(
             'db_host' => DB_HOSTNAME,
@@ -388,23 +307,18 @@ class OpencartInstaller {
             $data['salt'] = $salt;
             $data['password'] = sha1( $salt . sha1($salt . sha1(PASSWORD)));
         }
-
         $this->db->fill_mysql($data);
     }
-
     private function installShopunity($target_url) {
         $this->install_mbooth($target_url);
         $this->db->query("INSERT INTO " . DB_PREFIX . "extension SET `type` = '" . $this->db->escape('module') . "', `code` = '" . $this->db->escape('shopunity') . "'");
         $this->db->addPermission('1', 'access', 'extension/module/shopunity');
         $this->db->addPermission('1', 'modify', 'extension/module/shopunity');
     }
-
-
     // Get data for output
     private function getAllFolders() {
         $results = scandir('./');
         $folders = array();
-
         foreach ($results as $k => $v) {
             $check = False;
             foreach ($this->versions as $version) {
@@ -416,44 +330,35 @@ class OpencartInstaller {
                 unset($results[$k]);
             }
         }
-
         foreach ($results as $folder) {
             if (is_dir(dirname(__FILE__) . '/' . $folder) && $folder != '.' && $folder != '..' && $folder != '.git') {
                 $sub_results = scandir('./' . $folder);
                 $sub_folders = array();
                 foreach ($sub_results as $sub_folder) {
                     $git = false;
-
                     if (is_dir(dirname(__FILE__) . '/' . $folder . '/' . $sub_folder) && $sub_folder != '.' && $sub_folder != '..' && $sub_folder != '.git') {
                         $db_name = '';
                         $link = '';
-
                         if (file_exists(dirname(__FILE__) . '/' . $folder . '/' . $sub_folder . '/.git')) {
                                 $git = $this->get_git_config('url', dirname(__FILE__) . '/' . $folder . '/' . $sub_folder . '/.git/config');
                         }
                         if (file_exists(dirname(__FILE__) . '/' . $folder . '/' . $sub_folder . '/config.php')) {
-
                             $db_name = $this->get_defined_value('DB_DATABASE', dirname(__FILE__) . '/' . $folder . '/' . $sub_folder . '/config.php');
                             $db_used[] = $db_name;
                             $link = $this->get_defined_value('HTTP_SERVER', dirname(__FILE__) . '/' . $folder . '/' . $sub_folder . '/config.php');
                         }
-
                         $sub_folders[] = array('name' => $sub_folder, 'link' => $link, 'path' => dirname(__FILE__) . '/' . $folder . '/' . $sub_folder, 'db' => $db_name, 'git' => $git);
                     }
                 }
                 $folders[$folder] = $sub_folders;
             }
         }
-
         $this->setUnusedDb($folders);
-
         return $folders;
     }
-
     private function setUnusedDb($folders) {
         // Get all db
         $db_list = $this->getAllDatabases();
-
         foreach ($db_list as $key => $db) {
             foreach ($folders as $shops) {
                 foreach ($shops as $shop) {
@@ -463,18 +368,12 @@ class OpencartInstaller {
                 }
             }
         }
-
         $this->unused_db = $db_list;
-
     }
-
     private function getAllDatabases() {
-
         $db_used = array('information_schema', 'mysql', 'performance_schema');
-
         $db_list = array();
         $result = $this->db->query("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA ");
-
         foreach($result->rows as $scheme){
             if(!in_array($scheme['SCHEMA_NAME'], $db_used)){
                 $db_list[] = $scheme['SCHEMA_NAME'];
@@ -482,8 +381,6 @@ class OpencartInstaller {
         }
         return $db_list;
     }
-
-
     // Html
     private function showPage() {
         $folders = $this->getAllFolders();
@@ -500,7 +397,6 @@ class OpencartInstaller {
                 <body> '.$this->getBody($folders, $db_list).' </body>
             </html>';
     }
-
     private function getBody($folders, $db_list) {
         return '
             <style>
@@ -519,7 +415,6 @@ class OpencartInstaller {
             </div>
         ';
     }
-
     private function getStyle() {
         return '
             <style>
@@ -531,7 +426,6 @@ class OpencartInstaller {
                 }
             </style>';
     }
-
     private function getHeader() {
         $version_list = '';
         foreach($this->versions as $version){
@@ -558,7 +452,7 @@ class OpencartInstaller {
             }
             .header .form {
                 display: block;
-                padding: 20px 30px;
+                padding: 20px 10px;
                 float: left;
             }
             .header .store-link {
@@ -567,7 +461,7 @@ class OpencartInstaller {
             }
             .header .search {
                 display: block;
-                padding: 15px 30px;
+                padding: 15px 10px;
                 float: right;
             }
             .icon {
@@ -610,9 +504,7 @@ class OpencartInstaller {
         </div>';
         return $header;
     }
-
     private function getContent($folders, $db_list) {
-
         return '
             <style>
                 .content{
@@ -631,7 +523,6 @@ class OpencartInstaller {
                 </div>
             </div>';
     }
-
     private function getFolders($folders) {
         $output = '';
         foreach ($folders as $version => $shops) {
@@ -651,7 +542,6 @@ class OpencartInstaller {
         }
         return $output;
     }
-
     private function getShops($shops) {
         $output = '
             <style>
@@ -671,23 +561,19 @@ class OpencartInstaller {
             } else {
                 $a_git = '';
             }
-
             // Shop link
             if (!$shop["db"]){
                 $shop_link_class = 'class="not-working"';
             } else {
                 $shop_link_class = "";
             }
-
             // Delete Store button
             $delete_but = '<a onclick="deleteStore()" class="delete delete-store ve-btn ve-btn--danger ve-btn--sm" data-store="'.$shop["path"].'" data-database="'.$shop["db"].'">X</a>';
-
             // Database
             $database = $shop['db'];
             if (empty($shop["db"])) {
                 $database = 'Db: none';
             }
-
             // Output
             $output .= '
                 <div class="ve-list__item">
@@ -702,7 +588,6 @@ class OpencartInstaller {
         }
         return $output;
     }
-
     private function getDatabases($db_list) {
         if (empty($db_list)) {
             return '';
@@ -730,7 +615,6 @@ class OpencartInstaller {
                 </div>
             </div>';
     }
-
     private function getDb($db_list) {
         $output = '
             <style>
@@ -743,9 +627,7 @@ class OpencartInstaller {
                 }
             </style>
         ';
-
         $class = 'item_for_search';
-
         foreach ($db_list as $db) {
             $output .= '
                 <li class="li-db '.$class.'">
@@ -761,7 +643,6 @@ class OpencartInstaller {
         }
         return $output;
     }
-
     private function getFooter() {
         $footer = '
             <style>
@@ -794,10 +675,8 @@ class OpencartInstaller {
             </div>';
         return $footer;
     }
-
     private function getScripts() {
         $url = 'http://'.$_SERVER["HTTP_HOST"] . rtrim(dirname($_SERVER["SCRIPT_NAME"]), "/.\\") .'/';
-
         return '
         <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
         <script defer src="https://use.fontawesome.com/releases/v5.7.2/js/all.js" integrity="sha384-0pzryjIRos8mFBWMzSSZApWtPl/5++eIfzYmTgBBmXYdhvxPc+XcFEk+zJwDgWbP" crossorigin="anonymous"></script>
@@ -853,7 +732,7 @@ class OpencartInstaller {
             '.$this->getSubmitScript($url).'
             
             function deleteDb() {
-            	var delete_database = confirm("Are you sure, you want to delete this database?");
+                var delete_database = confirm("Are you sure, you want to delete this database?");
                 if (delete_database === true) {
     
                     $.ajax({
@@ -868,7 +747,7 @@ class OpencartInstaller {
                             $(".preloader-wrap").addClass("hide");
                         },
                         success: function(html) {
-                        	location.reload(true);
+                            location.reload(true);
                         },
                         error: function(xhr, ajaxOptions, thrownError) {
                             console.log(thrownError + "\r\n" + xhr.statusText + "\r\n" + xhr.responseText);
@@ -880,7 +759,6 @@ class OpencartInstaller {
             function deleteStore() {
                 var delete_store = confirm("Are you sure, you want to delete this store?");
                 if (delete_store === true) {
-
                     $.ajax({
                         url: "http://'.$_SERVER["HTTP_HOST"] . rtrim(dirname($_SERVER["SCRIPT_NAME"]), "/.\\") .'/index.php",
                         type: "post",
@@ -903,24 +781,23 @@ class OpencartInstaller {
                     });
                 }
             }
-
         </script>
         
         <!-- Search -->
         <script>
             $(document).ready(function(){ 
-            	var stores = "";
-            	sessionStorage.removeItem("db");
-            	$(".search").keyup(function(){
-            		const value = $("#search").val();
-            		
+                var stores = "";
+                sessionStorage.removeItem("db");
+                $(".search").keyup(function(){
+                    const value = $("#search").val();
+                    
                     if (stores === "") {
                         stores = getStores();
                     }
                     searchStores(value, stores);
                     searchDatabases(value);
-            		
-            	});
+                    
+                });
             });
             
             function getStores() {
@@ -948,13 +825,13 @@ class OpencartInstaller {
             }
             
             function searchStores(value, stores) {
-            	const div = $("#pointerEventsShops");
-            	div.html("")
-            	
-            	if (value === "") {
-            		var result = stores
-            	} else {
-            		let names = [];
+                const div = $("#pointerEventsShops");
+                div.html("")
+                
+                if (value === "") {
+                    var result = stores
+                } else {
+                    let names = [];
                     let i = 0
                     for (let version in stores) {
                         for (let key in stores[version]) {
@@ -1002,18 +879,18 @@ class OpencartInstaller {
                             }
                         }
                     }
-            	}
+                }
                 
                 var versions = Object.keys(result);
                 versions.reverse();
-            	
-            	for (let t = 0; t < versions.length; t++) {
-            		
-            		var keys = Object.keys(result[versions[t]]);
-            		var stores = "";
-            		for (let l = 0; l < keys.length; l++) {
-            			let link = result[versions[t]][keys[l]].link
-            			stores += `<div class="ve-list__item">
+                
+                for (let t = 0; t < versions.length; t++) {
+                    
+                    var keys = Object.keys(result[versions[t]]);
+                    var stores = "";
+                    for (let l = 0; l < keys.length; l++) {
+                        let link = result[versions[t]][keys[l]].link
+                        stores += `<div class="ve-list__item">
                                 <div>
                                     <span class="span-git"></span>
                                     <div class="text-left">
@@ -1029,8 +906,8 @@ class OpencartInstaller {
                                     </span>
                                 </div>
                             </div>`
-            		} 
-            		div.append(`<style>
+                    } 
+                    div.append(`<style>
                                 .span-git {
                                     padding-left: 0;
                                     flex: 0;
@@ -1048,21 +925,21 @@ class OpencartInstaller {
                             <div class="ve-list ve-list--borderless">` + stores + `</div>
                         </div>
                     </div>`)
-            	}
-            	
-            	
+                }
+                
+                
             }
             
             function searchDatabases(value) {
                 const ol_db = $("#ol_db")
                 
                 if (!sessionStorage.getItem("db")) {
-                	var items = $(".item_for_search");
-                	var name = [];
+                    var items = $(".item_for_search");
+                    var name = [];
                     for (let i = 0; i < items.length; i++) {
                         name[i] = items[i].children[0].children[0].innerText
                     }
-                	sessionStorage.setItem("db", name);
+                    sessionStorage.setItem("db", name);
                 }
                 
                 ol_db.html("");
@@ -1117,10 +994,8 @@ class OpencartInstaller {
         </script>
         ';
     }
-
     private function getSubmitScript($url) {
         $script = '';
-
         if (DEBUG == 1) {
             $script .= '$("#submit").on("click",function(){
                             window.location.href = "'.$url.'index.php?name=" + $("#store_name").val() + "&version=" + $("#input_version").val()
@@ -1162,27 +1037,21 @@ class OpencartInstaller {
         }
         return $script;
     }
-
-
     // Connecting to Database
     private function connectMysqli() {
         define('DB_DRIVER', 'mysqli');
         $this->db = new DBMySQLi(DB_HOSTNAME,  DB_USERNAME, DB_PASSWORD);
     }
-
     // Functions
     private function get_git_config($defined, $file) {
         $txt_file    = file_get_contents($file);
         $rows        = explode("\n", $txt_file);
         array_shift($rows);
-
         foreach($rows as $row => $data) {
-
             if(strpos($data, $defined)){
                 $row_data = explode(" ", $data);
                 return $row_data[2];
             }
-
         }
         return false;
     }
@@ -1191,10 +1060,8 @@ class OpencartInstaller {
         $txt_file    = file_get_contents($file);
         $rows        = explode("\n", $txt_file);
         array_shift($rows);
-
         foreach($rows as $row => $data)
         {
-
             if(strpos($data, $defined)){
                 $row_data = explode("'", $data);
                 return $row_data[3];
@@ -1202,19 +1069,14 @@ class OpencartInstaller {
         }
         return false;
     }
-
     private function install_mbooth($target_url){
         $file_zip = DESTINATION."arhive.zip";
-
         $this->download($target_url, DESTINATION, $file_zip);
-
         $this->move_dir(SOURCE, DESTINATION);
         $this->remove_dir(SOURCE);
         unlink($file_zip);
     }
-
     private function download($target_url, $file_dest, $file_zip){
-
         $userAgent = 'Googlebot/2.1 (http://www.googlebot.com/bot.html)';
         $ch = curl_init();
         $fp = fopen("$file_zip", "w");
@@ -1249,9 +1111,7 @@ class OpencartInstaller {
     }
     
     private function move_dir($source, $dest){
-
         $files = scandir($source);
-
         foreach($files as $file){
     
             if($file == '.' || $file == '..' || $file == '.DS_Store') continue;
@@ -1262,7 +1122,6 @@ class OpencartInstaller {
                 }
                 $this->move_dir($source.$file.'/', $dest.$file.'/');
             } elseif (!rename($source.$file, $dest.$file)){
-
             }
         }
     }
@@ -1271,79 +1130,57 @@ class OpencartInstaller {
         if (!file_exists($dir)) {
             return true;
         }
-
         if (!is_dir($dir)) {
             return unlink($dir);
         }
-
         foreach (scandir($dir) as $item) {
             if ($item == '.' || $item == '..') {
                 continue;
             }
-
             if (!$this->remove_dir($dir . DIRECTORY_SEPARATOR . $item)) {
                 return false;
             }
-
         }
-
         return rmdir($dir);
     }
-
 }
-
 final class DBMySQLi {
     private $link;
-
     public function __construct($hostname, $username, $password) {
         $this->link = new mysqli($hostname, $username, $password);
-
         if ($this->link->connect_error) {
             trigger_error('Error: Could not make a database link (' . $this->link->connect_errno . ') ' . $this->link->connect_error);
         }
-
         $this->link->set_charset("utf8");
         $this->link->query("SET SQL_MODE = ''");
     }
-
     public function create($database){
         if (!$this->link->query('CREATE DATABASE '.$database)) {
           trigger_error('Error creating database: ' . $database);
         }
-
     }
-
     public function connect ($database){
-
         if (!$this->link->select_db($database)) {
             trigger_error('Error: Could not connect to database ' . $database);
         }
-
         $this->link->query("SET NAMES 'utf8'");
         $this->link->query("SET CHARACTER SET utf8");
         $this->link->query("SET CHARACTER_SET_CONNECTION=utf8");
         $this->link->query("SET SQL_MODE = ''");
-
     }
-
     public function query($sql) {
         $query = $this->link->query($sql);
-
         if (!$this->link->errno) {
             if ($query instanceof mysqli_result) {
                 $data = array();
-
                 while ($row = $query->fetch_assoc()) {
                     $data[] = $row;
                 }
-
                 $result = new stdClass();
                 $result->num_rows = $query->num_rows;
                 $result->row = isset($data[0]) ? $data[0] : array();
                 $result->rows = $data;
-
                 $query->close();
-
                 return $result;
             } else {
                 return true;
@@ -1352,108 +1189,72 @@ final class DBMySQLi {
             trigger_error('Error: ' . $this->link->error  . '<br />Error No: ' . $this->link->errno . '<br />' . $sql);
         }
     }
-
     public function escape($value) {
         return $this->link->real_escape_string($value);
     }
-
     public function countAffected() {
         return $this->link->affected_rows;
     }
-
     public function getLastId() {
         return $this->link->insert_id;
     }
-
     public function __destruct() {
         $this->link->close();
     }
-
     public function fill_mysql($data) {
-
         $this->connect($data['db_name']);
-
         $file = DIR_OPENCART . 'install/opencart.sql';
-
         if (!file_exists($file)) {
             exit('Could not load sql file: ' . $file);
         }
-
         $lines = file($file);
-
         if ($lines) {
             $sql = '';
-
             foreach($lines as $line) {
                 if ($line && (substr($line, 0, 2) != '--') && (substr($line, 0, 1) != '#')) {
                     $sql .= $line;
-
                     if (preg_match('/;\s*$/', $line)) {
                         $sql = str_replace("DROP TABLE IF EXISTS `oc_", "DROP TABLE IF EXISTS `" . $data['db_prefix'], $sql);
                         $sql = str_replace("CREATE TABLE `oc_", "CREATE TABLE `" . $data['db_prefix'], $sql);
                         $sql = str_replace("INSERT INTO `oc_", "INSERT INTO `" . $data['db_prefix'], $sql);
-
                         $this->query($sql);
-
                         $sql = '';
                     }
                 }
             }
-
             $this->query("SET CHARACTER SET utf8");
-
             $this->query("SET @@session.sql_mode = 'MYSQL40'");
-
             $this->query("DELETE FROM `" . $data['db_prefix'] . "user` WHERE user_id = '1'");
-
             $this->query("INSERT INTO `" . $data['db_prefix'] . "user` SET user_id = '1', user_group_id = '1', username = '" . $this->escape($data['username']) . "', salt = '" . $this->escape($data['salt']) . "', password = '" . $this->escape($data['password']) . "', status = '1', email = '" . $this->escape($data['email']) . "', date_added = NOW()");
-
             $this->query("DELETE FROM `" . $data['db_prefix'] . "setting` WHERE `key` = 'config_email'");
-
-
-
             $this->query("DELETE FROM `" . $data['db_prefix'] . "setting` WHERE `key` = 'config_url'");
-
             $this->query("DELETE FROM `" . $data['db_prefix'] . "setting` WHERE `key` = 'config_encryption'");
-
             if($data['version'] < 201){
                 $this->query("INSERT INTO `" . $data['db_prefix'] . "setting` SET `group` = 'config', `key` = 'config_email', value = '" . $this->escape($data['email']) . "'");
                 $this->query("INSERT INTO `" . $data['db_prefix'] . "setting` SET `group` = 'config', `key` = 'config_url', value = '" . $this->escape(HTTP_OPENCART) . "'");
                 $this->query("INSERT INTO `" . $data['db_prefix'] . "setting` SET `group` = 'config', `key` = 'config_encryption', value = '" . $this->escape(md5(mt_rand())) . "'");
-
             }else{
                 $this->query("INSERT INTO `" . $data['db_prefix'] . "setting` SET `code` = 'config', `key` = 'config_email', value = '" . $this->escape($data['email']) . "'");
                 $this->query("INSERT INTO `" . $data['db_prefix'] . "setting` SET `code` = 'config', `key` = 'config_url', value = '" . $this->escape(HTTP_OPENCART) . "'");
                 $this->query("INSERT INTO `" . $data['db_prefix'] . "setting` SET `code` = 'config', `key` = 'config_encryption', value = '" . $this->escape(md5(mt_rand())) . "'");
-
             }
             $this->query("UPDATE `" . $data['db_prefix'] . "product` SET `viewed` = '0'");
-
         }
     }
-
     public function addPermission($user_group_id, $type, $route) {
         $user_group_query = $this->query("SELECT DISTINCT * FROM " . DB_PREFIX . "user_group WHERE user_group_id = '" . (int)$user_group_id . "'");
-
         if ($user_group_query->num_rows) {
-
             if(VERSION >= 210){
-
                 $data = json_decode($user_group_query->row['permission'], true);
             }else{
                 $data = unserialize($user_group_query->row['permission']);
             }
-
-
             $data[$type][] = $route;
-
-
             if(VERSION >= 210){
                 $data = json_encode($data);
             }else{
                 $data = serialize($data);
             }
-
             $this->query("UPDATE " . DB_PREFIX . "user_group SET permission = '" . $this->escape($data) . "' WHERE user_group_id = '" . (int)$user_group_id . "'");
         }
     }
