@@ -1,11 +1,11 @@
 <?php
 $opencartInstaller = new OpencartInstaller();
 class OpencartInstaller {
-    private $OIversion = '1.0.0';
+    private $OIversion = '1.0.1';
     private $versions = array(
         array(
             'code' => '303',
-            'version' => '3.0.3.1',
+            'version' => '3.0.3.6',
         ),
         array(
             'code' => '302',
