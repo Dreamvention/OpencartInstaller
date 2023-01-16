@@ -684,8 +684,8 @@ class OpencartInstaller
                     <div>
                         <span class="span-git">' . $a_git . '</span>
                         <div class="text-left">
-                        <a href="' . $shop["link"] . '" title="' . $shop["db"] . '">' . $shop['name'] . '</a> &nbsp
-                        (<a href="' . $shop["link"] . '/admin" title="' . $shop["db"] . '">admin</a>)<br/>
+                        <a href="' . $shop["link"] . '" target="_blank" title="' . $shop["db"] . '">' . $shop['name'] . '</a> &nbsp
+                        (<a href="' . $shop["link"] . '/admin" target="_blank" title="' . $shop["db"] . '">admin</a>)<br/>
                             <span class="small span-db">' . $database . '</span>
                         </div>
                         <span class="text-right">' . $delete_but . '</span>
