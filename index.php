@@ -5,6 +5,10 @@ class OpencartInstaller
     private $OIversion = '1.0.1';
     private $versions = array(
         array(
+            'code' => '4021',
+            'version' => '4.0.2.1',
+        ),
+        array(
             'code' => '4011',
             'version' => '4.0.1.1',
         ),
@@ -27,6 +31,10 @@ class OpencartInstaller
         array(
             'code' => '303',
             'version' => '3.0.3.6',
+        ),
+        array(
+            'code' => '3032',
+            'version' => '3.0.3.2',
         ),
         array(
             'code' => '302',
@@ -126,28 +134,30 @@ class OpencartInstaller
         $name = str_replace(" ", "_", $name);
         $parts = explode('_', $name);
         unset($parts[0]);
-        $path = VERSION . '/' . $name;
+        $realpath = str_replace('\\', '/' , __DIR__);
+        $path = $realpath . '/' . VERSION . '/' . $name;
+        $http_path =  VERSION . '/' . $name;
         // HTTP
-        define('HTTP_SERVER', 'http://' . $_SERVER['HTTP_HOST'] . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/.\\') . '/' . $path . '/');
-        define('HTTP_OPENCART', 'http://' . $_SERVER['HTTP_HOST'] . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/.\\') . '/' . $path . '/');
-        define('HTTPS_OPENCART', 'http://' . $_SERVER['HTTP_HOST'] . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/.\\') . '/' . $path . '/');
-        $realpath = implode('/', explode('\\', realpath(dirname(__FILE__))));
+        define('HTTP_SERVER', 'http://' . $_SERVER['HTTP_HOST'] . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/.\\') . '/' . $http_path . '/');
+        define('HTTP_OPENCART', 'http://' . $_SERVER['HTTP_HOST'] . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/.\\') . '/' . $http_path . '/');
+        define('HTTPS_OPENCART', 'http://' . $_SERVER['HTTP_HOST'] . rtrim(dirname($_SERVER['SCRIPT_NAME']), '/.\\') . '/' . $http_path . '/');
+        
         // DIR
-        define('DIR_OPENCART', str_replace('\'', '/', $realpath) . '/' . $path . '/');
-        define('DIR_SOURCE', str_replace('\'', '/', $realpath) . '/' . $path . '/upload/');
+        define('DIR_TEMP', str_replace('\\', '/' , __DIR__) . '/temp/');
+        if (!is_dir(DIR_TEMP)) mkdir($realpath . '/temp', 0755, true);
+        define('DIR_OPENCART', str_replace('\'', '/', $realpath) . '/' . $http_path . '/');
+        define('DIR_SOURCE', str_replace('\'', '/', $realpath) . '/' . $http_path . '/upload/');
         define('DESTINATION', $path . '/');
         define('SOURCE', $path . '/upload/');
         // create database
         $this->createDatabase();
         // create a directory
-        if (!file_exists('./' . $path . '/')) {
-            mkdir('./' . $path . '/', 0755, true);
+        if (!file_exists($path . '/')) {
+            mkdir($path . '/', 0755, true);
         }
 
         // upload files
         $this->uploadFiles($path);
-        // move files
-        $this->removeFiles();
         // give correct permissions
         $this->correctPermissions();
         // config.php definition
@@ -158,12 +168,15 @@ class OpencartInstaller
         $this->fillDatabase();
         // install shopunity
         if ($this->installShopunity && VERSION_FULL < '4.0.0.0') {
-            $download = json_decode(file_get_contents(HTTP_API . "extensions/d_shopunity/download?store_version=" . VERSION_FULL), true);
+            $download = json_decode(file_get_contents(HTTP_API . "extensions/d_shopunity/download?store_version=" . (VERSION_FULL > '3.0.3.6' ? '3.0.3.6' : VERSION_FULL)), true);
             $target_url = $download['download'];
             $this->installShopunity($target_url);
         }
         // Delete install folder
         $this->remove_dir(DESTINATION . 'install');
+        
+        unlink(DESTINATION . 'config-dist.php');
+        unlink(DESTINATION . 'admin/config-dist.php');
         echo 'all created';
     }
     private function createDatabase()
@@ -184,8 +197,8 @@ class OpencartInstaller
             dl('zip.so');
         }
 
-        if (VERSION_FULL <= '3.0.3.6') {
-            $download = json_decode(file_get_contents(HTTP_API . "extensions/opencart/download?store_version=" . VERSION_FULL, false, stream_context_create($arrContextOptions)), true);
+        if (VERSION_FULL <= '3.0.3.6' && VERSION_FULL != '3.0.3.2') {
+            $download = json_decode(file_get_contents(HTTP_API . "extensions/opencart/download?store_version=" . VERSION_FULL, false, stream_context_create((isset($arrContextOptions) ? $arrContextOptions : array()))), true);
             $target_url = $download['download'];
         } else {
             $target_url = 'https://github.com/opencart/opencart/releases/download/'.VERSION_FULL.'/opencart-'.VERSION_FULL.'.zip';
@@ -198,8 +211,8 @@ class OpencartInstaller
     }
     private function removeFiles()
     {
-        $this->move_dir(SOURCE, DESTINATION);
-        $this->remove_dir(SOURCE);
+        // $this->move_dir(DIR_TEMP, DESTINATION);
+        // $this->remove_dir(DIR_TEMP);
         unlink(DESTINATION . 'opencart.zip');
         unlink(DESTINATION . 'config-dist.php');
         unlink(DESTINATION . 'admin/config-dist.php');
@@ -684,8 +697,8 @@ class OpencartInstaller
                     <div>
                         <span class="span-git">' . $a_git . '</span>
                         <div class="text-left">
-                        <a href="' . $shop["link"] . '" target="_blank" title="' . $shop["db"] . '">' . $shop['name'] . '</a> &nbsp
-                        (<a href="' . $shop["link"] . '/admin" target="_blank" title="' . $shop["db"] . '">admin</a>)<br/>
+                        <a href="' . $shop["link"] . '"  target="_blank" title="' . $shop["db"] . '">' . $shop['name'] . '</a> &nbsp
+                        (<a href="' . $shop["link"] . 'admin" target="_blank" title="' . $shop["db"] . '">admin</a>)<br/>
                             <span class="small span-db">' . $database . '</span>
                         </div>
                         <span class="text-right">' . $delete_but . '</span>
@@ -1186,15 +1199,12 @@ class OpencartInstaller
     {
         $file_zip = DESTINATION . "arhive.zip";
         $this->download($target_url, DESTINATION, $file_zip);
-        $this->move_dir(SOURCE, DESTINATION);
-        $this->remove_dir(SOURCE);
-        unlink($file_zip);
     }
     private function download($target_url, $file_dest, $file_zip)
     {
         $userAgent = 'Googlebot/2.1 (http://www.googlebot.com/bot.html)';
         $ch = curl_init();
-        $fp = fopen("$file_zip", "w");
+        $fp = fopen($file_zip, "w+");
         curl_setopt($ch, CURLOPT_USERAGENT, $userAgent);
         curl_setopt($ch, CURLOPT_URL, $target_url);
         curl_setopt($ch, CURLOPT_FAILONERROR, true);
@@ -1213,16 +1223,74 @@ class OpencartInstaller
         }
 
         curl_close($ch);
-        $zip = new ZipArchive;
+        fclose($fp);
+        $zip = new \ZipArchive();
 
         if (!$zip) {
             exit;
         }
-        if ($zip->open("$file_zip") != "true") {
+        
+        if ($zip->open($file_zip) !== true) {
             exit;
         }
-        $zip->extractTo($file_dest);
+        $zip->extractTo(DIR_TEMP);
         $zip->close();
+
+        $files = $this->read_dir(DIR_TEMP);
+        
+        if ($files) {
+            foreach ($files as $file) {
+                $source = substr($file, strlen(DIR_TEMP));
+                $destination = str_replace('\\', '/', $source);
+    
+                $path_new = '';
+                $directories = explode('/', dirname($destination));
+                if ((isset($directories[0]) && $directories[0] == 'upload') || (isset($directories[1]) && $directories[1] == 'upload')) {
+                    
+                    if (isset($directories[1]) && $directories[1] == 'upload') {
+                        unset($directories[0]);
+                        unset($directories[1]);
+                    } else {
+                        unset($directories[0]);
+                    }
+                } else {
+                    continue;
+                }
+    
+                foreach ($directories as $directory) {
+                    if (!$path_new) {
+                        $path_new = $directory . '/';
+                    } else {
+                        $path_new = $path_new . $directory . '/';
+                    }
+                    if (!is_dir($file_dest . '/' . $path_new)){
+                        mkdir($file_dest . '/' . $path_new . '/', 0777);
+                    }
+                }
+
+                
+                
+                if (is_file($file) && !is_file($file_dest . $path_new . basename($destination))) copy($file, $file_dest . $path_new . basename($destination));
+            }
+        }
+        $this->remove_dir(DIR_TEMP);
+        unlink($file_zip);
+    }
+
+    private function read_dir($dir) {
+        $result = [];
+        foreach(scandir($dir) as $filename) {
+            if ($filename[0] === '.' || $filename[0] === '..') continue;
+            $filePath = $dir . $filename;
+            if (is_dir($filePath)) {
+                $filePath .= '/';
+                foreach ($this->read_dir($filePath) as $childFilename) {
+                    $result[] = $childFilename;
+                }
+            }
+            $result[] = $dir . $filename;
+        }
+        return $result;
     }
 
     private function move_dir($source, $dest)
@@ -1394,7 +1462,12 @@ final class DBMySQLi
             exit('Could not load file: ' . $file);
         }
         require($file);
-        $tables = VERSION > 4000 ? Opencart\System\Helper\DbSchema\db_schema() : db_schema();
+        if (VERSION > 4011) {
+            $tables = oc_db_schema();
+        } else {
+            $tables = VERSION > 4000 ? Opencart\System\Helper\DbSchema\db_schema() : db_schema();
+        }
+        
 
         include DIR_OPENCART . 'system/library/db.php';
         include DIR_OPENCART . 'system/library/db/mysqli.php';
@@ -1408,6 +1481,7 @@ final class DBMySQLi
             html_entity_decode(DB_DATABASE, ENT_QUOTES, 'UTF-8'),
             DB_PORT
         );
+        
     
         foreach ($tables as $table) {
             $table_query = $db->query("SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '" . $data['db_name'] . "' AND TABLE_NAME = '" . $data['db_prefix'] . $table['name'] . "'");
@@ -1476,7 +1550,12 @@ final class DBMySQLi
                 }
             }
         }
-        $token = VERSION > 4000 ? $db->escape(Opencart\System\Helper\General\token(512)) : $db->escape(token(512));
+        if (VERSION > 4011) {
+            $token = $db->escape(oc_token(512));
+        } else {
+            $token = VERSION > 4000 ? $db->escape(Opencart\System\Helper\General\token(512)) : $db->escape(token(512));
+        }
+        
         $db->query("SET CHARACTER SET utf8mb4");
                
 		$db->query("DELETE FROM `" . $data['db_prefix'] . "user` WHERE `user_id` = '1'");
