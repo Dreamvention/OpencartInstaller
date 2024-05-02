@@ -5,8 +5,20 @@ class OpencartInstaller
     private $OIversion = '1.0.1';
     private $versions = array(
         array(
+            'code' => '4023',
+            'version' => '4.0.2.3',
+        ),
+        array(
+            'code' => '4022',
+            'version' => '4.0.2.2',
+        ),
+        array(
             'code' => '4021',
             'version' => '4.0.2.1',
+        ),
+        array(
+            'code' => '4020',
+            'version' => '4.0.2.0',
         ),
         array(
             'code' => '4011',
@@ -19,6 +31,10 @@ class OpencartInstaller
         array(
             'code' => '4000',
             'version' => '4.0.0.0',
+        ),
+        array(
+            'code' => '3039',
+            'version' => '3.0.3.9',
         ),
         array(
             'code' => '3038',
@@ -78,8 +94,8 @@ class OpencartInstaller
     private $unused_db = array();
     public function __construct()
     {
-        if (is_file('config.php')) {
-            require_once('config.php');
+        if (is_file(__DIR__.'/config.php')) {
+            require_once(__DIR__.'/config.php');
         }
        
         ini_set('max_execution_time', 960);
