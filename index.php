@@ -1,4 +1,31 @@
 <?php
+
+if (! function_exists('array_column')) {
+    function array_column(array $input, $columnKey, $indexKey = null) {
+        $array = array();
+        foreach ($input as $value) {
+            if ( !array_key_exists($columnKey, $value)) {
+                trigger_error("Key \"$columnKey\" does not exist in array");
+                return false;
+            }
+            if (is_null($indexKey)) {
+                $array[] = $value[$columnKey];
+            }
+            else {
+                if ( !array_key_exists($indexKey, $value)) {
+                    trigger_error("Key \"$indexKey\" does not exist in array");
+                    return false;
+                }
+                if ( ! is_scalar($value[$indexKey])) {
+                    trigger_error("Key \"$indexKey\" does not contain scalar value");
+                    return false;
+                }
+                $array[$value[$indexKey]] = $value[$columnKey];
+            }
+        }
+        return $array;
+    }
+}
 $opencartInstaller = new OpencartInstaller();
 class OpencartInstaller
 {
@@ -31,6 +58,10 @@ class OpencartInstaller
         array(
             'code' => '4000',
             'version' => '4.0.0.0',
+        ),
+        array(
+            'code' => '3040',
+            'version' => '3.0.4.0',
         ),
         array(
             'code' => '3039',
@@ -1294,7 +1325,7 @@ class OpencartInstaller
     }
 
     private function read_dir($dir) {
-        $result = [];
+        $result = array();
         foreach(scandir($dir) as $filename) {
             if ($filename[0] === '.' || $filename[0] === '..') continue;
             $filePath = $dir . $filename;
@@ -1513,7 +1544,7 @@ final class DBMySQLi
             }
 
             if (isset($table['primary'])) {
-                $primary_data = [];
+                $primary_data = array();
 
                 foreach ($table['primary'] as $primary) {
                     $primary_data[] = "`" . $primary . "`";
@@ -1524,7 +1555,7 @@ final class DBMySQLi
 
             if (isset($table['index'])) {
                 foreach ($table['index'] as $index) {
-                    $index_data = [];
+                    $index_data = array();
 
                     foreach ($index['key'] as $key) {
                         $index_data[] = "`" . $key . "`";
