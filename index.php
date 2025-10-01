@@ -32,6 +32,22 @@ class OpencartInstaller
     private $OIversion = '1.0.1';
     private $versions = array(
         array(
+            'code' => '4103',
+            'version' => '4.1.0.3',
+        ),
+        array(
+            'code' => '4102',
+            'version' => '4.1.0.2',
+        ),
+        array(
+            'code' => '4101',
+            'version' => '4.1.0.1',
+        ),
+        array(
+            'code' => '4100',
+            'version' => '4.1.0.0',
+        ),
+        array(
             'code' => '4023',
             'version' => '4.0.2.3',
         ),
@@ -58,6 +74,10 @@ class OpencartInstaller
         array(
             'code' => '4000',
             'version' => '4.0.0.0',
+        ),
+        array(
+            'code' => '3041',
+            'version' => '3.0.4.1',
         ),
         array(
             'code' => '3040',
@@ -247,8 +267,10 @@ class OpencartInstaller
         if (VERSION_FULL <= '3.0.3.6' && VERSION_FULL != '3.0.3.2') {
             $download = json_decode(file_get_contents(HTTP_API . "extensions/opencart/download?store_version=" . VERSION_FULL, false, stream_context_create((isset($arrContextOptions) ? $arrContextOptions : array()))), true);
             $target_url = $download['download'];
-        } else {
+        } else if (VERSION_FULL !== '3.0.4.1') {
             $target_url = 'https://github.com/opencart/opencart/releases/download/'.VERSION_FULL.'/opencart-'.VERSION_FULL.'.zip';
+        } else {
+            $target_url = 'https://github.com/opencart/opencart/releases/download/'.VERSION_FULL.'/'.VERSION_FULL.'.zip';
         }
 
         $file_zip = $path . "/opencart.zip";
@@ -455,9 +477,12 @@ class OpencartInstaller
 
         if (VERSION < 4000) {
             $this->db->fill_mysql_3($data);
-        } else {
+        } else if (VERSION < 4100) {
             $data['password'] = PASSWORD;
             $this->db->fill_mysql_4($data);
+        } else {
+            $data['password'] = PASSWORD;
+            $this->db->fill_mysql_41($data);
         }
     }
     private function installShopunity($target_url)
@@ -1622,5 +1647,120 @@ final class DBMySQLi
 
         // set the current years prefix
         $db->query("UPDATE `" . $data['db_prefix'] . "setting` SET `value` = 'INV-" . date('Y') . "-00' WHERE `key` = 'config_invoice_prefix'");
+    }
+
+    public function fill_mysql_41($data)
+    {
+        $file = DIR_OPENCART . 'system/helper/db_schema.php';
+        if (!file_exists($file)) {
+            exit('Could not load file: ' . $file);
+        }
+        require($file);
+        $tables = oc_db_schema();
+        
+
+        include DIR_OPENCART . 'system/library/db.php';
+        include DIR_OPENCART . 'system/library/db/mysqli.php';
+        include DIR_OPENCART . 'system/helper/general.php';
+
+        $db = new \Opencart\System\Library\DB(
+            DB_DRIVER,
+            html_entity_decode(DB_HOSTNAME, ENT_QUOTES, 'UTF-8'),
+            html_entity_decode(DB_USERNAME, ENT_QUOTES, 'UTF-8'),
+            html_entity_decode(DB_PASSWORD, ENT_QUOTES, 'UTF-8'),
+            html_entity_decode(DB_DATABASE, ENT_QUOTES, 'UTF-8'),
+            DB_PORT
+        );
+        
+    
+        foreach ($tables as $table) {
+            $table_query = $db->query("SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '" . $data['db_name'] . "' AND TABLE_NAME = '" . $data['db_prefix'] . $table['name'] . "'");
+
+            if ($table_query->num_rows) {
+                $db->query("DROP TABLE `" . $data['db_prefix'] . $table['name'] . "`");
+            }
+
+            $sql = "CREATE TABLE `" . $data['db_prefix'] . $table['name'] . "` (" . "\n";
+
+            foreach ($table['field'] as $field) {
+                $sql .= "  `" . $field['name'] . "` " . $field['type'] . (!empty($field['not_null']) ? " NOT NULL" : "") . (isset($field['default']) ? " DEFAULT '" . $db->escape($field['default']) . "'" : "") . (!empty($field['auto_increment']) ? " AUTO_INCREMENT" : "") . ",\n";
+            }
+
+            if (isset($table['primary'])) {
+                $primary_data = [];
+
+                foreach ($table['primary'] as $primary) {
+                    $primary_data[] = "`" . $primary . "`";
+                }
+
+                $sql .= "  PRIMARY KEY (" . implode(",", $primary_data) . "),\n";
+            }
+
+            if (isset($table['index'])) {
+                foreach ($table['index'] as $index) {
+                    $index_data = [];
+
+                    foreach ($index['key'] as $key) {
+                        $index_data[] = "`" . $key . "`";
+                    }
+
+                    $sql .= "  KEY `" . $index['name'] . "` (" . implode(",", $index_data) . "),\n";
+                }
+            }
+
+            $sql = rtrim($sql, ",\n") . "\n";
+            $sql .= ") ENGINE=" . $table['engine'] . " CHARSET=" . $table['charset'] . " COLLATE=" . $table['collate'] . ";\n";
+
+            $db->query($sql);
+        }
+
+        // Data
+		$lines = file(DIR_OPENCART . '/install/opencart-en-gb.sql', FILE_IGNORE_NEW_LINES);
+
+		if ($lines) {
+			$sql = '';
+
+			$start = false;
+
+			foreach ($lines as $line) {
+				if (substr($line, 0, 12) == 'INSERT INTO ') {
+					$sql = '';
+
+					$start = true;
+				}
+
+				if ($start) {
+					$sql .= $line;
+				}
+
+				if (substr($line, -2) == ');') {
+					$db->query(str_replace("INSERT INTO `oc_", "INSERT INTO `" . $data['db_prefix'], $sql));
+
+					$start = false;
+				}
+			}
+		}
+
+		$db->query("SET CHARACTER SET utf8mb4");
+
+		$db->query("SET @@session.sql_mode = ''");
+
+		$db->query("DELETE FROM `" . $data['db_prefix'] . "user` WHERE `user_id` = '1'");
+		$db->query("INSERT INTO `" . $data['db_prefix'] . "user` SET `user_id` = '1', `user_group_id` = '1', `username` = '" . $db->escape($data['username']) . "', `password` = '" . $db->escape(password_hash(html_entity_decode($data['password'], ENT_QUOTES, 'UTF-8'), PASSWORD_DEFAULT)) . "', `firstname` = 'John', `lastname` = 'Doe', `email` = '" . $db->escape($data['email']) . "', `status` = '1', `date_added` = NOW()");
+
+		$db->query("UPDATE `" . $data['db_prefix'] . "setting` SET `code` = 'config', `key` = 'config_language_catalog', `value` = '" . $db->escape('en-gb') . "' WHERE `key` = 'config_language_catalog'");
+		$db->query("UPDATE `" . $data['db_prefix'] . "setting` SET `code` = 'config', `key` = 'config_language_admin', `value` = '" . $db->escape('en-gb') . "' WHERE `key` = 'config_language_admin'");
+
+		$db->query("UPDATE `" . $data['db_prefix'] . "setting` SET `code` = 'config', `key` = 'config_email', `value` = '" . $db->escape($data['email']) . "' WHERE `key` = 'config_email'");
+
+		$db->query("INSERT INTO `" . $data['db_prefix'] . "api` SET `username` = 'Default', `key` = '" . $db->escape(oc_token(256)) . "', `status` = '1', `date_added` = NOW(), `date_modified` = NOW()");
+
+		$api_id = $db->getLastId();
+
+		$db->query("DELETE FROM `" . $data['db_prefix'] . "setting` WHERE `key` = 'config_api_id'");
+		$db->query("INSERT INTO `" . $data['db_prefix'] . "setting` SET `code` = 'config', `key` = 'config_api_id', `value` = '" . (int)$api_id . "'");
+
+		// Set the current years prefix
+		$db->query("UPDATE `" . $data['db_prefix'] . "setting` SET `value` = 'INV-" . date('Y') . "-00' WHERE `key` = 'config_invoice_prefix'");
     }
 }
